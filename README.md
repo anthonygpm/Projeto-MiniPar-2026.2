@@ -1,1 +1,1 @@
-# Projeto-MiniPar-2026.2
+# Compilador MiniPar 2026.2

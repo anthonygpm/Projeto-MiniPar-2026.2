@@ -1,0 +1,22 @@
+.vscode
+
+# ./output
+/output/*
+meu_teste.cpp
+meu_teste.exe
+
+# ./src
+codegen.o
+lexer.o
+main.o
+parser.o
+semantic.o
+
+# misc
+minipar_compiler.exe
+
+__pycache__
+
+# temp_code/
+!/temp_code/.gitkeep
+/temp_code/*
