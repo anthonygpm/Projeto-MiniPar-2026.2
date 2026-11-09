@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_file
+from web_pipeline import run_phases, build_executable, run_executable
 import subprocess
 import os
 import sys
@@ -32,6 +33,53 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/didatico')
+def didatico():
+    """Web 2 (didática): mostra cada fase do compilador. A Web 1 ('/') não muda."""
+    return render_template('didatico.html')
+
+# ==========================================
+# Web 2 (didática): uma rota por fase do compilador
+# Corpo: {"code": "..."}  ->  JSON de web_pipeline.run_phases
+# ==========================================
+def _web2_fase(fase):
+    code = (request.get_json(silent=True) or {}).get('code', '')
+    return jsonify(run_phases(code, fase))
+
+@app.route('/api/tokens', methods=['POST'])
+def api_tokens(): return _web2_fase('tokens')
+
+@app.route('/api/ast', methods=['POST'])
+def api_ast(): return _web2_fase('ast')
+
+@app.route('/api/semantic', methods=['POST'])
+def api_semantic(): return _web2_fase('semantic')
+
+@app.route('/api/tac', methods=['POST'])
+def api_tac(): return _web2_fase('tac')
+
+@app.route('/api/cpp', methods=['POST'])
+def api_cpp(): return _web2_fase('cpp')
+
+@app.route('/api/build', methods=['POST'])
+def api_build():
+    """Compila e devolve o executável como download."""
+    code = (request.get_json(silent=True) or {}).get('code', '')
+    b = build_executable(code)
+    if not b['ok']:
+        return jsonify({"ok": False, "log": b['log']}), 400
+    return send_file(os.path.abspath(b['exe']), as_attachment=True,
+                     download_name=os.path.basename(b['exe']))
+
+@app.route('/api/run', methods=['POST'])
+def api_run():
+    """Compila e executa. Corpo: {"code": "...", "stdin": "linha1\nlinha2"}."""
+    data = request.get_json(silent=True) or {}
+    stdin = data.get('stdin', '')
+    if isinstance(stdin, list):
+        stdin = "\n".join(str(x) for x in stdin)
+    return jsonify(run_executable(data.get('code', ''), stdin))
 
 @app.route('/api/tests', methods=['GET'])
 def get_tests():
