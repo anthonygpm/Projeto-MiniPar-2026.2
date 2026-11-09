@@ -783,7 +783,13 @@ var numero = to_number(input("Digite um número: "));
 <literal_numero> ::= <digito> { <digito> } [ "." { <digito> } ]
 ```
 
-Representa inteiros e ponto flutuante. Internamente ambos são tratados como `double` no C++ gerado.
+Representa inteiros e ponto flutuante. No C++ gerado, literais inteiros são de 64 bits
+(`long long`, ex.: `42` vira `42LL`) e literais com ponto são `double`. Assim, somas longas
+e o gerador LCG dos testes 8–10 (`estado * 1103515245 + 12345`) não estouram 32 bits.
+
+> Atenção: `/` entre dois inteiros faz divisão inteira no C++ gerado (`7 / 2` vale `3`).
+> Para divisão real, use um operando com ponto: `7 / 2.0`.
+
 
 **Exemplos:** `0`, `42`, `3.14`, `0.5`
 
@@ -830,6 +836,15 @@ As seguintes funções são reconhecidas pelo analisador semântico e traduzidas
 | `len(col)` | `len(list\|string)` → `number` | Comprimento de coleção |
 | `to_number(s)` | `to_number(string)` → `number` | Converte string para número |
 | `parse_ints(s)` | `parse_ints(string)` → `list` | Parseia inteiros de string separados por espaço |
+| `format(x, casas)` | `format(number, int)` → `string` | Número com casas decimais fixas, como `f"{x:.4f}"` (2026.2) |
+| `clock()` | `clock()` → `number` | Relógio de alta precisão em segundos, como `time.perf_counter()` (2026.2) |
+| `int(x)` | `int(number\|string)` → `int` | Inteiro de 64 bits, truncando em direção a zero (2026.2) |
+| `floor(x)` | `floor(number)` → `int` | Maior inteiro ≤ x, em 64 bits (2026.2) |
+
+Indexação de string (2026.2): `s[i]` devolve um texto de 1 caractere, como no Python.
+Índices negativos contam do fim (`s[-1]`). Em listas, matrizes e strings, um índice fora
+dos limites encerra o programa com `[ERRO DE EXECUCAO] Indice i fora dos limites`.
+
 
 ### Métodos de Lista (acesso via ponto)
 
@@ -1135,7 +1150,8 @@ O analisador semântico (`src/semantic.py`) usa inferência simples de tipos com
 | `c_channel(ip, porta)` | `std::make_shared<MiniParChannel>(ip, porta)` |
 | `send(canal, msg)` | `canal->sendData(__to_string(msg))` |
 | `receive(canal)` | `canal->receiveData()` |
-| `[1, 2, 3]` | `std::vector<double>{1, 2, 3}` |
+| `[1, 2, 3]` | `std::vector<double>{1LL, 2LL, 3LL}` |
+| `lista[i]` | `__index(lista, i)` (confere os limites) |
 | `matrix(l, c, v)` | `__make_matrix(l, c, v)` |
 | `exp(x)` | `std::exp(x)` |
 | `random()` | `random_val()` |
@@ -1143,6 +1159,7 @@ O analisador semântico (`src/semantic.py`) usa inferência simples de tipos com
 | `len(x)` | `x.size()` |
 | `range(n)` | `__minipar_range(n)` |
 | `input(p)` | `input(p)` (helper C++) |
+| `format(x, n)` / `clock()` / `int(x)` / `floor(x)` | `__format` / `__clock` / `__int` / `__floor` |
 
 ---
 

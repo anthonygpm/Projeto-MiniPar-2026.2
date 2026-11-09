@@ -1,0 +1,62 @@
+# Builtins dos testes 8 a 10: int, floor, clock, format, indexacao de string e inteiro de 64 bits
+
+# Gerador LCG do enunciado: estado = (estado * 1103515245 + 12345) & 0x7FFFFFFF
+# O produto passa de 32 bits; os inteiros do MiniPar sao de 64 bits.
+# (x & 0x7FFFFFFF) == (x % 2147483648) para x >= 0.
+class GeradorLCG {
+    var estado = 123456789;
+
+    func uniforme(minimo, maximo) {
+        this.estado = ((this.estado * 1103515245) + 12345) % 2147483648;
+        var fracao = this.estado / 2147483647.0;
+        return minimo + ((maximo - minimo) * fracao);
+    }
+}
+
+# Consome CPU por um tempo proporcional a 'segundos' (como no enunciado)
+func simular_atraso(segundos) {
+    var iteracoes = int(segundos * 1500000);
+    var soma = 0;
+    var i = 0;
+    while (i < iteracoes) {
+        soma = soma + i;
+        i = i + 1;
+    }
+    return soma;
+}
+
+seq {
+    print("==== Builtins dos testes 8 a 10 ====");
+
+    var gerador = new GeradorLCG();
+    var k = 1;
+    while (k <= 5) {
+        var valor = gerador.uniforme(0.05, 0.15);
+        print("LCG", k, ": estado", gerador.estado, "valor", format(valor, 6));
+        k = k + 1;
+    }
+
+    print("int(7.9):", int(7.9), "int(-7.9):", int(-7.9), "floor(-7.9):", floor(-7.9));
+    print("int(\"42\") + 1:", int("42") + 1);
+    print("iteracoes:", int(0.1 * 1500000));
+    print("soma 64 bits:", simular_atraso(0.1));
+
+    # Indexacao de string: mapeia iteracoes do Mandelbrot para caracteres
+    var caracteres = " .:-=+#%@";
+    var linha = "";
+    var iteracoes = [0, 12, 25, 50, 75, 100];
+    for (var it in iteracoes) {
+        linha = linha + caracteres[int((it / 100.0) * (len(caracteres) - 1))];
+    }
+    print("linha: [" + linha + "]", len(caracteres), caracteres[-1]);
+
+    print(format(3.14159, 2), format(2.5, 1), format(1234.5, 0), format(-0.00001, 4));
+
+    # clock(): so a diferenca entre duas leituras importa
+    var inicio = clock();
+    simular_atraso(0.05);
+    var fim = clock();
+    if ((fim - inicio) >= 0) {
+        print("clock ok");
+    }
+}

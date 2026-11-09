@@ -1,14 +1,17 @@
+# Teste 7: quicksort nao recursivo com pilha explicita
+# Quicksort nao recursivo: a recursao e substituida por uma pilha explicita
+# de intervalos (inicio, fim), empilhados com append e desempilhados com pop.
 func quicksort_iterativo(arr) {
-    var stack = [0, 4];
-    var sp = 2;
-    while (sp > 0) {
-        sp = sp - 1;
-        var fim = stack[sp];
-        sp = sp - 1;
-        var inicio = stack[sp];
+    var stack = [];
+    stack.append(0);
+    stack.append(len(arr) - 1);
+    while (len(stack) > 0) {
+        var fim = stack.pop();
+        var inicio = stack.pop();
         if (inicio >= fim) {
             continue;
         }
+        # Particionamento: pivo = ultimo elemento do intervalo
         var pivot = arr[fim];
         var i = inicio - 1;
         var j = inicio;
@@ -25,14 +28,11 @@ func quicksort_iterativo(arr) {
         var tmp2 = arr[i];
         arr[i] = arr[fim];
         arr[fim] = tmp2;
-        stack[sp] = inicio;
-        sp = sp + 1;
-        stack[sp] = i - 1;
-        sp = sp + 1;
-        stack[sp] = i + 1;
-        sp = sp + 1;
-        stack[sp] = fim;
-        sp = sp + 1;
+        # Empilha os subarrays a esquerda e a direita do pivo
+        stack.append(inicio);
+        stack.append(i - 1);
+        stack.append(i + 1);
+        stack.append(fim);
     }
     return arr;
 }
