@@ -31,6 +31,12 @@ class TokenType(Enum):
     INPUT     = auto()
     PRINT     = auto()
     MATRIX    = auto()
+    # Paralelismo com Fork e Join (2026.2)
+    FORK      = auto()
+    JOIN      = auto()
+    ON        = auto()
+    CORE      = auto()
+    HOST      = auto()
     TYPE      = auto()
     PLUS      = auto()
     MINUS     = auto()
@@ -83,6 +89,11 @@ KEYWORDS: dict[str, TokenType] = {
     "receive":   TokenType.RECEIVE,
     "input":     TokenType.INPUT,
     "matrix":    TokenType.MATRIX,
+    "fork":      TokenType.FORK,
+    "join":      TokenType.JOIN,
+    "on":        TokenType.ON,
+    "core":      TokenType.CORE,
+    "host":      TokenType.HOST,
     "true":      TokenType.BOOL_LITERAL,
     "false":     TokenType.BOOL_LITERAL,
     "number":    TokenType.TYPE,

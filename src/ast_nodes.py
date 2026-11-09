@@ -205,6 +205,45 @@ class IndexAssign(ASTNode):
     value: ASTNode
     line: int = 1
 
+# ------------------------------------------------------------------
+# Paralelismo com Fork e Join (MiniPar 2026.2)
+#
+#   var t1 = fork trabalhador(lote) on core(1);          # núcleo da CPU
+#   var t2 = fork trabalhador(lote) on host("10.0.0.2", 5001);  # outro computador
+#   var r1 = join t1;                                     # espera e coleta
+# ------------------------------------------------------------------
+
+@dataclass
+class CoreTarget(ASTNode):
+    """Destino do fork: um núcleo da CPU (numerado a partir de 1)."""
+    index: ASTNode
+    line: int = 1
+
+@dataclass
+class HostTarget(ASTNode):
+    """Destino do fork: outro computador, alcançado por ip e porta."""
+    ip: ASTNode
+    port: ASTNode
+    line: int = 1
+
+@dataclass
+class ForkExpr(ASTNode):
+    """Dispara a chamada `call` como subtarefa independente.
+
+    `call` é sempre um FuncCallExpr ou MethodCall. `destination` é None
+    quando o programa não indica destino (o sistema operacional escolhe o
+    núcleo). O valor da expressão é um identificador de tarefa (tipo "task").
+    """
+    call: ASTNode
+    destination: Optional[ASTNode] = None
+    line: int = 1
+
+@dataclass
+class JoinExpr(ASTNode):
+    """Aguarda a tarefa `task` terminar e devolve o resultado dela."""
+    task: ASTNode
+    line: int = 1
+
 @dataclass
 class Program(ASTNode):
     statements: List[ASTNode] = field(default_factory=list)

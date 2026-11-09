@@ -7,7 +7,8 @@ from ast_nodes import (
     BinaryExpr, UnaryExpr, NumberExpr, StringExpr, BoolExpr, IdentifierExpr, IfStmt, WhileStmt,
     DoWhileStmt, ForStmt, BreakStmt, ContinueStmt, InputExpr,
     ClassDecl, FuncDecl, ReturnStmt, MethodCall, FuncCallExpr, PropertyAccess, PropertyAssign, NewExpr, ThisExpr,
-    CChannelExpr, SendStmt, ReceiveExpr, ListLiteral, MatrixCreateExpr, IndexExpr, IndexAssign
+    CChannelExpr, SendStmt, ReceiveExpr, ListLiteral, MatrixCreateExpr, IndexExpr, IndexAssign,
+    ForkExpr, JoinExpr, CoreTarget, HostTarget
 )
 
 class Parser:
@@ -227,11 +228,12 @@ class Parser:
         if self._match(TokenType.DO): return self._parse_do_while_stmt()
         if self._match(TokenType.FOR): return self._parse_for_stmt()
 
-        if self._peek().type in (TokenType.IDENTIFIER, TokenType.THIS, TokenType.NEW, TokenType.RECEIVE, TokenType.INPUT, TokenType.C_CHANNEL, TokenType.MATRIX, TokenType.LBRACKET):
+        if self._peek().type in (TokenType.IDENTIFIER, TokenType.THIS, TokenType.NEW, TokenType.RECEIVE, TokenType.INPUT, TokenType.C_CHANNEL, TokenType.MATRIX, TokenType.LBRACKET, TokenType.FORK, TokenType.JOIN):
             expr = self._parse_expression()
             if self._match(TokenType.ASSIGN):
                 return self._parse_assignment_tail(expr)
-            elif isinstance(expr, (MethodCall, FuncCallExpr)):
+            # Chamadas, "join t;" e "fork f();" podem aparecer sozinhas como comando
+            elif isinstance(expr, (MethodCall, FuncCallExpr, ForkExpr, JoinExpr)):
                 self._consume(TokenType.SEMICOLON, "Esperado ';'")
                 return expr
             sys.exit(print(f"[ERRO] Linha {expr.line}: Instrucao ou expressao isolada invalida", file=sys.stderr) or 1)
@@ -240,7 +242,42 @@ class Parser:
         sys.exit(print(f"[ERRO SINTATICO] Linha {tok.line}: Instrucao nao reconhecida: {tok.lexeme!r}", file=sys.stderr) or 1)
 
     def _parse_expression(self) -> ASTNode:
+        # fork tem a menor precedência: "fork f(x) on core(1)" não se combina com operadores
+        if self._match(TokenType.FORK):
+            return self._parse_fork_expr()
         return self._parse_or()
+
+    def _parse_fork_expr(self) -> ASTNode:
+        """<expressao_fork> ::= "fork" <chamada> [ "on" <destino_fork> ]
+
+        A subtarefa é sempre uma chamada de função ou de método. O destino é
+        um núcleo da CPU (core) ou outro computador (host); sem "on", o
+        sistema operacional escolhe o núcleo.
+        """
+        line = self._tokens[self._pos - 1].line
+        call = self._parse_primary()
+        if not isinstance(call, (FuncCallExpr, MethodCall)):
+            print(f"[ERRO SINTATICO] Linha {line}: 'fork' exige uma chamada de funcao ou metodo, ex.: fork calcular(x) on core(1)", file=sys.stderr)
+            sys.exit(1)
+        destination = None
+        if self._match(TokenType.ON):
+            dest_tok = self._peek()
+            if self._match(TokenType.CORE):
+                self._consume(TokenType.LPAREN, "Esperado '(' apos 'core'")
+                index = self._parse_expression()
+                self._consume(TokenType.RPAREN, "Esperado ')' apos numero do nucleo")
+                destination = CoreTarget(index=index, line=dest_tok.line)
+            elif self._match(TokenType.HOST):
+                self._consume(TokenType.LPAREN, "Esperado '(' apos 'host'")
+                ip = self._parse_expression()
+                self._consume(TokenType.COMMA, "Esperado ',' entre ip e porta do host")
+                port = self._parse_expression()
+                self._consume(TokenType.RPAREN, "Esperado ')' apos porta do host")
+                destination = HostTarget(ip=ip, port=port, line=dest_tok.line)
+            else:
+                print(f"[ERRO SINTATICO] Linha {dest_tok.line}: Esperado 'core(n)' ou 'host(ip, porta)' apos 'on' (Encontrado: {dest_tok.lexeme!r})", file=sys.stderr)
+                sys.exit(1)
+        return ForkExpr(call=call, destination=destination, line=line)
 
     def _parse_or(self) -> ASTNode:
         expr = self._parse_and()
@@ -284,6 +321,10 @@ class Parser:
         return expr
 
     def _parse_unary(self) -> ASTNode:
+        # "join t" é um operador prefixo: join t1 + join t2 soma os dois resultados
+        if self._match(TokenType.JOIN):
+            line = self._tokens[self._pos - 1].line
+            return JoinExpr(task=self._parse_unary(), line=line)
         if self._peek().type in (TokenType.MINUS, TokenType.PLUS, TokenType.NOT):
             op_tok = self._advance()
             node = UnaryExpr(op=op_tok.lexeme, operand=self._parse_unary())
