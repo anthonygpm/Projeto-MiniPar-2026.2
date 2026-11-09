@@ -7,8 +7,12 @@ from ast_nodes import (
     UnaryExpr, NumberExpr, StringExpr, BoolExpr, SeqBlock, ParBlock, IfStmt, WhileStmt,
     DoWhileStmt, ForStmt, BreakStmt, ContinueStmt, InputExpr,
     ClassDecl, FuncDecl, ReturnStmt, MethodCall, FuncCallExpr, PropertyAccess, PropertyAssign, NewExpr, ThisExpr,
-    CChannelExpr, SendStmt, ReceiveExpr, ListLiteral, MatrixCreateExpr, IndexExpr, IndexAssign
+    CChannelExpr, SendStmt, ReceiveExpr, ListLiteral, MatrixCreateExpr, IndexExpr, IndexAssign,
+    ForkExpr, JoinExpr, CoreTarget, HostTarget
 )
+
+# Tipos que podem viajar pela rede num fork ... on host(...)
+_SERIALIZABLE_TYPES = ("number", "int", "string", "bool", "list", "matrix", "var", "unknown")
 
 @dataclass
 class Symbol:
@@ -17,6 +21,7 @@ class Symbol:
     params: List[str] = field(default_factory=list)
     attributes: Dict[str, str] = field(default_factory=dict)
     methods: Dict[str, List[str]] = field(default_factory=dict)
+    loop_depth: int = 0          # profundidade de laço onde a tarefa (fork) foi declarada
 
 class SemanticAnalyzer:
     def __init__(self) -> None:
@@ -27,6 +32,13 @@ class SemanticAnalyzer:
         self._classes: Dict[str, Symbol] = {}
         self._functions: Dict[str, Symbol] = {}
         self._loop_depth = 0
+        # Diagnósticos estruturados (linha, tipo, mensagem) para as interfaces
+        self.diagnostics: List[Dict[str, object]] = []
+        # Fork/Join: tarefas já aguardadas com certeza neste caminho do programa
+        self._joined: set = set()
+        # Fork/Join: tarefas declaradas (símbolo, linha, contexto) e as que foram usadas depois
+        self._task_symbols: List[tuple] = []
+        self._referenced_tasks: set = set()
         self._enter_scope()
 
     def _enter_scope(self) -> None: self._scopes.append({})
@@ -49,7 +61,13 @@ class SemanticAnalyzer:
 
     def _report(self, line: int, message: str) -> None:
         print(f"[ERRO SEMANTICO] Linha {line}{self._get_context()}: {message}", file=sys.stderr)
+        self.diagnostics.append({"kind": "erro", "line": line, "message": message})
         self._has_errors = True
+
+    def _warn(self, line: int, message: str, context: str = "") -> None:
+        """Aviso: não interrompe a compilação, mas aponta um provável engano."""
+        print(f"[AVISO SEMANTICO] Linha {line}{context}: {message}")
+        self.diagnostics.append({"kind": "aviso", "line": line, "message": message})
 
     def _infer_type(self, node: Optional[ASTNode]) -> str:
         if node is None: return "unknown"
@@ -61,6 +79,8 @@ class SemanticAnalyzer:
         if isinstance(node, ReceiveExpr): return "string"
         if isinstance(node, ListLiteral): return "list"
         if isinstance(node, MatrixCreateExpr): return "matrix"
+        if isinstance(node, ForkExpr): return "task"
+        if isinstance(node, JoinExpr): return "unknown"   # tipo do retorno da subtarefa
         if isinstance(node, NewExpr): return node.class_name
         if isinstance(node, ThisExpr): return self._current_class or "unknown"
         if isinstance(node, IdentifierExpr):
@@ -113,11 +133,18 @@ class SemanticAnalyzer:
             if not self._types_compatible(declared_type, actual_type):
                 self._report(node.line, f"Tipo incompativel em '{node.name}': esperado {declared_type}, recebido {actual_type}.")
             self._define_symbol(node.name, declared_type, node.line)
+            if isinstance(node.init_value, ForkExpr):
+                sym = self._scopes[-1][node.name]
+                sym.loop_depth = self._loop_depth
+                self._task_symbols.append((sym, node.line, self._get_context()))
         elif isinstance(node, Assignment):
             sym = self._lookup(node.name)
             if sym is None:
                 self._report(node.line, f"Variavel '{node.name}' nao declarada.")
             self.validate_node(node.value)
+            if sym and isinstance(node.value, ForkExpr):
+                # A variável passa a guardar uma tarefa nova, ainda não aguardada
+                self._joined.discard(id(sym))
             if sym and not self._types_compatible(sym.type, self._infer_type(node.value)):
                 self._report(node.line, f"Tipo incompativel em atribuicao de '{node.name}'.")
         elif isinstance(node, PrintStmt):
@@ -143,8 +170,11 @@ class SemanticAnalyzer:
             self.validate_node(node.target)
             self.validate_node(node.value)
         elif isinstance(node, IdentifierExpr):
-            if self._lookup(node.name) is None:
+            sym = self._lookup(node.name)
+            if sym is None:
                 self._report(node.line, f"Variavel '{node.name}' nao declarada.")
+            elif sym.type == "task":
+                self._referenced_tasks.add(id(sym))
         elif isinstance(node, BinaryExpr):
             self.validate_node(node.left)
             self.validate_node(node.right)
@@ -156,12 +186,17 @@ class SemanticAnalyzer:
             self.validate_node(node.operand)
         elif isinstance(node, (SeqBlock, ParBlock)):
             self._enter_scope()
-            for stmt in node.statements: self.validate_node(stmt)
+            for stmt in node.statements: self._validate_statement(stmt)
             self._exit_scope()
         elif isinstance(node, IfStmt):
             self.validate_node(node.condition)
-            self.validate_node(node.then_branch)
-            if node.else_branch: self.validate_node(node.else_branch)
+            # Uma tarefa só conta como aguardada depois do if se houve join nos dois ramos
+            before = set(self._joined)
+            self._validate_branch(node.then_branch)
+            after_then = self._joined
+            self._joined = set(before)
+            if node.else_branch: self._validate_branch(node.else_branch)
+            self._joined = after_then & self._joined
         elif isinstance(node, WhileStmt):
             self.validate_node(node.condition)
             self._loop_depth += 1
@@ -204,8 +239,10 @@ class SemanticAnalyzer:
             self._enter_scope()
             old_function = self._current_function
             self._current_function = node.name
+            old_joined, self._joined = self._joined, set()
             for p in node.params: self._define_symbol(p, "var", node.line)
             self.validate_node(node.body)
+            self._joined = old_joined
             self._current_function = old_function
             self._exit_scope()
         elif isinstance(node, ReturnStmt):
@@ -246,8 +283,79 @@ class SemanticAnalyzer:
             pass
         elif isinstance(node, InputExpr):
             if node.prompt: self.validate_node(node.prompt)
+        elif isinstance(node, ForkExpr):
+            self._validate_fork(node)
+        elif isinstance(node, JoinExpr):
+            self._validate_join(node)
+
+    # ------------------------------------------------------------------
+    # Fork / Join
+    # ------------------------------------------------------------------
+    def _validate_statement(self, stmt: ASTNode) -> None:
+        """Valida um comando de um bloco; avisa quando o resultado de um fork é descartado."""
+        if isinstance(stmt, ForkExpr):
+            self._warn(stmt.line, "Resultado do fork descartado: a tarefa nunca podera ser aguardada com join. Use: var t = fork ...;", self._get_context())
+        self.validate_node(stmt)
+
+    def _validate_branch(self, branch: Optional[ASTNode]) -> None:
+        if isinstance(branch, (SeqBlock, ParBlock)): self.validate_node(branch)
+        else: self._validate_statement(branch)
+
+    def _validate_fork(self, node: ForkExpr) -> None:
+        call = node.call
+        self.validate_node(call)   # função/método existe e aridade confere
+        dest = node.destination
+        if isinstance(dest, CoreTarget):
+            self.validate_node(dest.index)
+            t = self._infer_type(dest.index)
+            if t not in ("number", "int", "var", "unknown"):
+                self._report(dest.line, f"O numero do nucleo em core(...) deve ser numerico, recebido {t}.")
+            elif isinstance(dest.index, NumberExpr) and ("." in dest.index.value or int(dest.index.value) < 1):
+                self._report(dest.line, f"core({dest.index.value}) invalido: os nucleos sao numerados com inteiros a partir de 1.")
+        elif isinstance(dest, HostTarget):
+            self.validate_node(dest.ip)
+            self.validate_node(dest.port)
+            ip_t, port_t = self._infer_type(dest.ip), self._infer_type(dest.port)
+            if ip_t not in ("string", "var", "unknown"):
+                self._report(dest.line, f"O endereco em host(ip, porta) deve ser uma string, recebido {ip_t}.")
+            if port_t not in ("number", "int", "var", "unknown"):
+                self._report(dest.line, f"A porta em host(ip, porta) deve ser numerica, recebido {port_t}.")
+            elif isinstance(dest.port, NumberExpr) and ("." in dest.port.value or not 1 <= int(dest.port.value) <= 65535):
+                self._report(dest.line, f"Porta {dest.port.value} invalida: use um inteiro entre 1 e 65535.")
+            # Outro computador só recebe dados: nada de objetos, canais ou métodos
+            if isinstance(call, MethodCall):
+                self._report(node.line, f"fork para host(...) exige uma funcao global: o metodo '{call.method_name}' depende de um objeto que nao pode ser enviado pela rede.")
+            elif isinstance(call, FuncCallExpr) and call.name not in self._functions:
+                self._report(node.line, f"fork para host(...) exige uma funcao declarada no programa; '{call.name}' e nativa.")
+            else:
+                for i, arg in enumerate(call.arguments, start=1):
+                    t = self._infer_type(arg)
+                    if t not in _SERIALIZABLE_TYPES:
+                        self._report(node.line, f"Argumento {i} de '{call.name}' (tipo {t}) nao pode ser enviado a outro computador; use number, string, bool ou list.")
+
+    def _validate_join(self, node: JoinExpr) -> None:
+        self.validate_node(node.task)
+        t = self._infer_type(node.task)
+        if t not in ("task", "var", "unknown"):
+            self._report(node.line, f"'join' espera uma tarefa criada por fork, recebeu {t}.")
+            return
+        if isinstance(node.task, IdentifierExpr):
+            sym = self._lookup(node.task.name)
+            # Dentro de laços a mesma linha roda várias vezes: só detecta duplicação
+            # no mesmo nível de laço em que a tarefa foi criada.
+            if sym and sym.type == "task" and self._loop_depth == sym.loop_depth:
+                if id(sym) in self._joined:
+                    self._report(node.line, f"Tarefa '{node.task.name}' ja foi aguardada com join (join duplicado).")
+                else:
+                    self._joined.add(id(sym))
+
+    def _warn_unjoined_tasks(self) -> None:
+        for sym, line, context in self._task_symbols:
+            if id(sym) not in self._referenced_tasks:
+                self._warn(line, f"Tarefa '{sym.name}' criada com fork nunca e aguardada com join; o programa pode terminar antes dela.", context)
 
     def analyze(self, program: Program) -> bool:
         self._collect_declarations(program)
-        for stmt in program.statements: self.validate_node(stmt)
+        for stmt in program.statements: self._validate_statement(stmt)
+        self._warn_unjoined_tasks()
         return not self._has_errors
