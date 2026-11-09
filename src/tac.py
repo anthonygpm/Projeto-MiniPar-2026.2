@@ -6,7 +6,8 @@ from ast_nodes import (
     UnaryExpr, NumberExpr, StringExpr, BoolExpr, IdentifierExpr, IfStmt, WhileStmt,
     DoWhileStmt, ForStmt, BreakStmt, ContinueStmt, InputExpr,
     ClassDecl, FuncDecl, ReturnStmt, MethodCall, FuncCallExpr, PropertyAccess, PropertyAssign, NewExpr, ThisExpr,
-    CChannelExpr, SendStmt, ReceiveExpr, ListLiteral, MatrixCreateExpr, IndexExpr, IndexAssign
+    CChannelExpr, SendStmt, ReceiveExpr, ListLiteral, MatrixCreateExpr, IndexExpr, IndexAssign,
+    ForkExpr, JoinExpr, CoreTarget, HostTarget
 )
 
 
@@ -66,11 +67,28 @@ class TACGenerator:
         self.label_count = 0
         self.break_stack: list[str] = []
         self.continue_stack: list[str] = []
+        # Nomes usados pelo programa; um temporário nunca recebe um deles
+        # (ex.: "var t1 = fork ..." não pode colidir com o temporário t1)
+        self._user_names: set[str] = set()
 
     def _temp(self) -> str:
         name = f"t{self.temp_count}"
         self.temp_count += 1
+        while name in self._user_names:
+            name = f"t{self.temp_count}"
+            self.temp_count += 1
         return name
+
+    def _collect_user_names(self, node: object) -> None:
+        """Percorre a AST guardando todo nome de variável, parâmetro e iterador."""
+        if isinstance(node, list):
+            for item in node: self._collect_user_names(item)
+            return
+        if not isinstance(node, ASTNode): return
+        if isinstance(node, (VarDecl, Assignment, IdentifierExpr)): self._user_names.add(node.name)
+        if isinstance(node, FuncDecl): self._user_names.update(node.params)
+        if isinstance(node, ForStmt) and node.iterator_name: self._user_names.add(node.iterator_name)
+        for value in vars(node).values(): self._collect_user_names(value)
 
     def _label(self, prefix: str) -> str:
         name = f"{prefix}_{self.label_count}"
@@ -142,7 +160,37 @@ class TACGenerator:
             else:
                 self._emit(f"{tmp} = input()")
             return tmp
+        if isinstance(node, ForkExpr):
+            return self._fork(node)
+        if isinstance(node, JoinExpr):
+            task = self._expr(node.task)
+            tmp = self._temp()
+            self._emit(f"{tmp} = join {task}")
+            return tmp
         return "?"
+
+    def _fork(self, node: ForkExpr) -> str:
+        """Gera:  param a1 ... param an
+                  tX = fork f, n on core k | on host ip, porta | on core auto
+
+        Igual a um 'call', mas o pai não espera: tX guarda o identificador da
+        tarefa, que um 'join tX' aguarda depois.
+        """
+        call = node.call
+        dest = node.destination
+        # Argumentos primeiro (como em 'call'); o destino é avaliado logo antes do disparo.
+        name = call.name if isinstance(call, FuncCallExpr) else f"{self._expr(call.object)}.{call.method_name}"
+        for arg in call.arguments:
+            self._emit(f"param {self._expr(arg)}")
+        if isinstance(dest, CoreTarget):
+            where = f"core {self._expr(dest.index)}"
+        elif isinstance(dest, HostTarget):
+            where = f"host {self._expr(dest.ip)}, {self._expr(dest.port)}"
+        else:
+            where = "core auto"
+        tmp = self._temp()
+        self._emit(f"{tmp} = fork {name}, {len(call.arguments)} on {where}")
+        return tmp
 
     def _stmt(self, node: Optional[ASTNode]) -> None:
         if node is None: return
@@ -211,8 +259,11 @@ class TACGenerator:
             self._emit(f"goto {self.continue_stack[-1] if self.continue_stack else 'CONTINUE'}")
         elif isinstance(node, ReturnStmt):
             self._emit(f"return {self._expr(node.value)}" if node.value else "return")
-        elif isinstance(node, (FuncCallExpr, MethodCall)):
+        elif isinstance(node, (FuncCallExpr, MethodCall, ForkExpr)):
             self._expr(node)
+        elif isinstance(node, JoinExpr):
+            # "join t;" como comando: espera sem guardar o resultado
+            self._emit(f"join {self._expr(node.task)}")
         elif isinstance(node, ClassDecl):
             self._emit(f"# class {node.name}")
             for method in node.methods: self._stmt(method)
@@ -224,6 +275,7 @@ class TACGenerator:
     def generate_text(self, program: Program) -> str:
         if any(isinstance(stmt, FuncDecl) and stmt.name == "quicksort_iterativo" for stmt in program.statements):
             return EXPECTED_QUICKSORT_TAC
+        self._collect_user_names(program.statements)
         for stmt in program.statements:
             self._stmt(stmt)
         return "\n".join(self.lines) + ("\n" if self.lines else "")
