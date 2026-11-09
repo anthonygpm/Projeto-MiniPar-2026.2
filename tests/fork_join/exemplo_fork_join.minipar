@@ -1,0 +1,44 @@
+# Exemplo de Fork/Join (MiniPar 2026.2)
+# A tarefa principal divide o trabalho em subtarefas independentes (fork)
+# e depois aguarda e junta os resultados (join).
+
+func avaliar_lote(avaliador, inicio, fim) {
+    var soma = 0;
+    for (var i = inicio; i < fim; i = i + 1) {
+        soma = soma + i;
+    }
+    return soma;
+}
+
+func fatorial(n) {
+    if (n <= 1) { return 1; }
+    return n * fatorial(n - 1);
+}
+
+# 1) Fork com nome e destino em núcleos específicos
+var t1 = fork avaliar_lote("Professor", 0, 40) on core(1);
+var t2 = fork avaliar_lote("Monitor 1", 40, 80) on core(2);
+
+# 2) Fork para outro computador (ip, porta)
+var t3 = fork fatorial(10) on host("127.0.0.1", 5001);
+
+# 3) Fork sem destino: o sistema operacional escolhe o núcleo
+var t4 = fork fatorial(5);
+
+# 4) Fork dentro de laço, guardando as tarefas numa lista
+var tarefas = [];
+for (var k = 0; k < 4; k = k + 1) {
+    tarefas.append(fork avaliar_lote("Monitor", k * 10, k * 10 + 10) on core(k + 1));
+}
+
+# Join: espera cada subtarefa e coleta o resultado
+var total = join t1 + join t2;
+print("Total dos lotes:", total);
+print("10! =", join t3);
+join t4;
+
+var soma_lista = 0;
+for (var t in tarefas) {
+    soma_lista = soma_lista + join t;
+}
+print("Soma das tarefas da lista:", soma_lista);

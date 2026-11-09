@@ -12,6 +12,10 @@
 > (arquivos `src/lexer.py`, `src/parser.py` e `src/ast_nodes.py`), cruzada com
 > o relatório técnico do projeto e as especificações formais fornecidas pelo professor.
 > Ela descreve **toda** a sintaxe aceita pelo compilador MiniPar 2026.1.
+>
+> **Acréscimos 2026.2:** paralelismo com `fork` e `join`, com a subtarefa
+> alocada a um núcleo da CPU (`core`) ou a outro computador (`host`).
+> Ver a seção 6.3 e as produções marcadas na gramática consolidada.
 
 ---
 
@@ -64,6 +68,7 @@ if  else  while  do  for  in
 break  continue  return
 seq  par  this
 c_channel  send  receive  input  print  matrix
+fork  join  on  core  host          (2026.2)
 true  false
 number  int  string  bool  void  list  dict
 ```
@@ -202,6 +207,8 @@ class Cachorro extends Animal {
             | <comando_continue>
             | <chamada_funcao> ";"
             | <chamada_metodo> ";"
+            | <expressao_fork> ";"          (* 2026.2 *)
+            | <expressao_join> ";"          (* 2026.2 *)
 ```
 
 ### 5.1 Atribuição
@@ -286,6 +293,84 @@ par {
     seq { print("Thread C"); }
 }
 ```
+
+### 6.3 Fork e Join (2026.2)
+
+- **Fork:** a tarefa principal dispara uma subtarefa independente e continua
+  executando. A subtarefa é sempre uma chamada de função ou de método.
+- **Join:** a tarefa principal (pai) espera a subtarefa terminar e coleta o
+  valor que ela retornou.
+
+O destino de cada subtarefa faz parte da produção, porque ela pode ir para
+um **núcleo da CPU** ou para **outro computador**:
+
+```bnf
+<expressao_fork> ::= "fork" <chamada> [ "on" <destino_fork> ]
+
+<chamada>        ::= <chamada_funcao>
+                   | <chamada_metodo>
+
+<destino_fork>   ::= "core" "(" <expressao> ")"
+                   | "host" "(" <expressao> "," <expressao> ")"
+
+<expressao_join> ::= "join" <expressao_unaria>
+```
+
+| Destino | Significado |
+|---------|-------------|
+| `on core(n)` | Executa no núcleo `n` da CPU (núcleos numerados a partir de 1) |
+| `on host(ip, porta)` | Envia a chamada a outro computador, que executa e devolve o resultado |
+| *(sem `on`)* | O sistema operacional escolhe o núcleo |
+
+O valor de `fork` é um identificador de tarefa (tipo `task`), guardado numa
+variável ou numa lista. `join` recebe essa tarefa e vale o retorno da
+subtarefa. Os dois podem aparecer sozinhos como comando (`join t;`).
+
+**Exemplo:**
+
+```minipar
+func avaliar_lote(avaliador, inicio, fim) { ... return soma; }
+
+var t1 = fork avaliar_lote("Professor", 0, 40) on core(1);
+var t2 = fork avaliar_lote("Monitor 1", 40, 80) on core(2);
+var t3 = fork fatorial(10) on host("192.168.0.12", 5001);
+
+# fork dentro de laço, com as tarefas numa lista
+var tarefas = [];
+for (var k = 0; k < 4; k = k + 1) {
+    tarefas.append(fork avaliar_lote("Monitor", k * 10, k * 10 + 10) on core(k + 1));
+}
+
+var total = join t1 + join t2;      # espera as duas e soma os resultados
+print("10! =", join t3);
+for (var t in tarefas) { print(join t); }
+```
+
+**Código de três endereços gerado** para:
+
+```minipar
+func avaliar_lote(avaliador, inicio, fim) { return fim - inicio; }
+var t1 = fork avaliar_lote("Professor", 0, 40) on core(1);
+var r = join t1;
+```
+
+```
+func avaliar_lote:
+t0 = fim - inicio
+return t0
+endfunc avaliar_lote
+param "Professor"
+param 0
+param 40
+t2 = fork avaliar_lote, 3 on core 1
+t1 = t2
+t3 = join t1
+r = t3
+```
+
+`fork` funciona como um `call` que não espera: os argumentos vão por `param`
+e o temporário recebe o identificador da tarefa. O temporário `t1` é pulado
+porque o programa já usa uma variável com esse nome.
 
 ---
 
@@ -502,7 +587,8 @@ func fatorial(n) {
 As expressões seguem a hierarquia de precedência implementada no parser (da menor para a maior precedência):
 
 ```bnf
-<expressao> ::= <expressao_ou>
+<expressao> ::= <expressao_fork>                    (* 2026.2 *)
+              | <expressao_ou>
 
 <expressao_ou>  ::= <expressao_e> { "||" <expressao_e> }
 
@@ -516,6 +602,7 @@ As expressões seguem a hierarquia de precedência implementada no parser (da me
 <expressao_fator> ::= <expressao_unaria> { ( "*" | "/" | "%" ) <expressao_unaria> }
 
 <expressao_unaria> ::= ( "-" | "+" | "!" ) <expressao_unaria>
+                     | "join" <expressao_unaria>        (* 2026.2 *)
                      | <expressao_posfixo>
 
 <expressao_posfixo> ::= <expressao_primaria>
@@ -542,12 +629,13 @@ As expressões seguem a hierarquia de precedência implementada no parser (da me
 | Nível | Operadores | Associatividade |
 |-------|-----------|-----------------|
 | 7 (mais alta) | `()` `[]` `.` (posfixo) | esquerda |
-| 6 | `!` `-` (unário) `+` (unário) | direita |
+| 6 | `!` `-` (unário) `+` (unário) `join` | direita |
 | 5 | `*` `/` `%` | esquerda |
 | 4 | `+` `-` | esquerda |
 | 3 | `==` `!=` `<` `>` `<=` `>=` | esquerda |
 | 2 | `&&` | esquerda |
-| 1 (mais baixa) | `\|\|` | esquerda |
+| 1 | `\|\|` | esquerda |
+| 0 (mais baixa) | `fork` *chamada* `on` *destino* | não se combina com operadores |
 
 ---
 
@@ -825,6 +913,8 @@ A seguir a gramática completa em formato BNF, em ordem de definição:
             | <comando_continue>
             | <chamada_funcao> ";"
             | <chamada_metodo> ";"
+            | <expressao_fork> ";"          (* 2026.2 *)
+            | <expressao_join> ";"          (* 2026.2 *)
 
 <atribuicao>        ::= <alvo_atribuicao> "=" <expressao> ";"
 <alvo_atribuicao>   ::= <IDENTIFIER>
@@ -902,9 +992,19 @@ A seguir a gramática completa em formato BNF, em ordem de definição:
 (* print já listado em <comando_print> *)
 
 
+(* ─── FORK E JOIN (2026.2) ─── *)
+
+<expressao_fork>     ::= "fork" <chamada> [ "on" <destino_fork> ]
+<chamada>            ::= <chamada_funcao> | <chamada_metodo>
+<destino_fork>       ::= "core" "(" <expressao> ")"
+                       | "host" "(" <expressao> "," <expressao> ")"
+<expressao_join>     ::= "join" <expressao_unaria>
+
+
 (* ─── EXPRESSÕES (hierarquia de precedência) ─── *)
 
-<expressao>          ::= <expressao_ou>
+<expressao>          ::= <expressao_fork>
+                       | <expressao_ou>
 
 <expressao_ou>       ::= <expressao_e> { "||" <expressao_e> }
 
@@ -919,6 +1019,7 @@ A seguir a gramática completa em formato BNF, em ordem de definição:
 <expressao_fator>    ::= <expressao_unaria> { ( "*" | "/" | "%" ) <expressao_unaria> }
 
 <expressao_unaria>   ::= ( "-" | "+" | "!" ) <expressao_unaria>
+                       | "join" <expressao_unaria>
                        | <expressao_posfixo>
 
 <expressao_posfixo>  ::= <expressao_primaria>
@@ -979,6 +1080,8 @@ O analisador semântico (`src/semantic.py`) usa inferência simples de tipos com
 | Literal string | `string` |
 | Literal booleano | `bool` |
 | Lista literal `[...]` | `list` |
+| `fork f(...)` (2026.2) | `task` |
+| `join t` (2026.2) | `unknown` (tipo do retorno da subtarefa) |
 | `matrix(...)` | `matrix` |
 | `c_channel(...)` | `c_channel` |
 | `receive(...)` | `string` |
@@ -1005,6 +1108,20 @@ O analisador semântico (`src/semantic.py`) usa inferência simples de tipos com
 | Método inexistente | `Método 'm' não declarado em 'C'.` |
 | Atributo inexistente | `Atributo 'a' não declarado em 'C'.` |
 | `break`/`continue` fora de laço | `'break' usado fora de laço de repetição.` |
+| **(2026.2)** Núcleo inválido | `core(0) invalido: os nucleos sao numerados com inteiros a partir de 1.` |
+| **(2026.2)** Núcleo não numérico | `O numero do nucleo em core(...) deve ser numerico, recebido string.` |
+| **(2026.2)** Host com ip/porta inválidos | `O endereco em host(ip, porta) deve ser uma string...` · `Porta 70000 invalida...` |
+| **(2026.2)** Método enviado a outro computador | `fork para host(...) exige uma funcao global...` |
+| **(2026.2)** Função nativa enviada a outro computador | `fork para host(...) exige uma funcao declarada no programa...` |
+| **(2026.2)** Argumento não serializável no host | `Argumento 1 de 'f' (tipo c_channel) nao pode ser enviado a outro computador...` |
+| **(2026.2)** `join` de algo que não é tarefa | `'join' espera uma tarefa criada por fork, recebeu number.` |
+| **(2026.2)** `join` duplicado | `Tarefa 't' ja foi aguardada com join (join duplicado).` |
+| **(2026.2)** Aviso: resultado do fork descartado | `Resultado do fork descartado: a tarefa nunca podera ser aguardada com join.` |
+| **(2026.2)** Aviso: tarefa nunca aguardada | `Tarefa 't' criada com fork nunca e aguardada com join...` |
+
+> O `join` duplicado é detectado por caminho do programa: depois de um `if`,
+> a tarefa só conta como aguardada se houve `join` nos dois ramos. Dentro de
+> laços, a verificação vale só no mesmo nível de laço em que a tarefa foi criada.
 
 ### Geração de Código C++20
 

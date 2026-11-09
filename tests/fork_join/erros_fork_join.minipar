@@ -1,0 +1,30 @@
+# Programa com erros de propósito, para mostrar as regras semânticas de Fork/Join
+
+class Contador {
+    var valor = 0;
+    func somar(x) { this.valor = this.valor + x; return this.valor; }
+}
+
+func dobro(x) { return x * 2; }
+
+var c = new Contador();
+var canal = c_channel("127.0.0.1", 6000);
+
+var a = fork dobro(2) on core(0);                  # erro: núcleos começam em 1
+var b = fork dobro(2) on core("um");               # erro: núcleo não numérico
+var d = fork c.somar(1) on host("10.0.0.2", 5001); # erro: método não vai pela rede
+var e = fork dobro(canal) on host("10.0.0.2", 5001); # erro: canal não é serializável
+var f = fork exp(1) on host("10.0.0.2", 5001);     # erro: função nativa
+var g = fork dobro(1) on host(10, 70000);          # erros: ip não é string, porta fora da faixa
+var h = fork naoexiste(1);                         # erro: função não declarada
+
+join a;
+join a;                                            # erro: join duplicado
+var n = 5;
+join n;                                            # erro: join de algo que não é tarefa
+
+if (n > 2) { join b; } else { join b; }            # ok: um join em cada ramo
+join b;                                            # erro: b já foi aguardada nos dois ramos
+
+fork dobro(3);                                     # aviso: resultado descartado
+var esquecida = fork dobro(4) on core(1);          # aviso: nunca aguardada
