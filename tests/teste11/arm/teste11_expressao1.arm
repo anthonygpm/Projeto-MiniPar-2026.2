@@ -1,0 +1,13 @@
+.global _start
+.text
+_start:
+    MOV    r0, #2
+    MOV    r1, #4
+    ADD    r2, r0, r1    @ resultado de '(2 + 4)'
+    MOV    r3, #7
+    MUL    r4, r2, r3    @ resultado de '((2 + 4) * 7)'
+    MOV    r5, #5
+    MOV    r6, #4
+    MUL    r7, r5, r6    @ resultado de '(5 * 4)'
+    SUB    r8, r4, r7    @ resultado de '(((2 + 4) * 7) - (5 * 4))'
+    b .    @ loop infinito para parar o programa (resultado em r8)

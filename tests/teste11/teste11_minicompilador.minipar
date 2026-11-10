@@ -1,0 +1,328 @@
+# ==============================================================================
+# Programa de Teste 11 - MiniCompilador de expressoes infixadas (MiniPar 2026.2)
+#
+# Versao em MiniPar do MiniCompiladorCompleto_ARMv7.java do professor: uma
+# aplicacao do proprio compilador MiniPar. Para cada expressao infixada (com
+# parenteses), o programa executa as fases de um compilador:
+#   1. Analise lexica          -> lista de tokens
+#   2. Analise sintatica       -> arvore sintatica abstrata (AST)
+#   3. Codigo de tres enderecos (TAC)
+#   4. Assembly ARMv7 para o CPULATOR (gravado num arquivo .arm)
+#   5. Tabela de simbolos
+#   6. Avaliacao da expressao
+#
+# Execucao (na raiz do projeto):
+#   Enter vazio = compila as 3 expressoes do Teste 11 e grava
+#   output/teste11_expressao1.arm, output/teste11_expressao2.arm, output/teste11_expressao3.arm
+# ==============================================================================
+
+# No da AST: operador (com dois filhos) ou operando (folha, filhos null)
+class No {
+    var valor = "";
+    var esquerda = null;
+    var direita = null;
+}
+
+# ------------------------------------------------------------------------------
+# Analisador lexico: quebra o texto em tokens (tipo + lexema)
+# ------------------------------------------------------------------------------
+class Lexer {
+    var tipos = [""];
+    var lexemas = [""];
+
+    func eh_digito(c) {
+        return c >= "0" && c <= "9";
+    }
+
+    func eh_letra(c) {
+        return (c >= "a" && c <= "z") || (c >= "A" && c <= "Z") || c == "_";
+    }
+
+    func analisar(entrada) {
+        var tipos = [];
+        var lexemas = [];
+        var i = 0;
+        var n = len(entrada);
+        while (i < n) {
+            var c = entrada[i];
+            if (c == " " || c == "\t") {
+                i = i + 1;
+            } else if (c == "#") {
+                i = n;                                   # comentario: ignora o resto
+            } else if (this.eh_digito(c)) {
+                var numero = "";
+                while (i < n && (this.eh_digito(entrada[i]) || entrada[i] == ".")) {
+                    numero = numero + entrada[i];
+                    i = i + 1;
+                }
+                tipos.append("NUMERO");
+                lexemas.append(numero);
+            } else if (this.eh_letra(c)) {
+                var nome = "";
+                while (i < n && (this.eh_letra(entrada[i]) || this.eh_digito(entrada[i]))) {
+                    nome = nome + entrada[i];
+                    i = i + 1;
+                }
+                tipos.append("IDENTIFICADOR");
+                lexemas.append(nome);
+            } else if (c == "+" || c == "-" || c == "*" || c == "/") {
+                tipos.append("OPERADOR");
+                lexemas.append(c);
+                i = i + 1;
+            } else if (c == "=") {
+                tipos.append("ATRIBUICAO");
+                lexemas.append(c);
+                i = i + 1;
+            } else if (c == "(" || c == ")") {
+                tipos.append("PARENTESE");
+                lexemas.append(c);
+                i = i + 1;
+            } else {
+                print("[ERRO LEXICO] Caractere invalido ignorado:", c);
+                i = i + 1;
+            }
+        }
+        this.tipos = tipos;
+        this.lexemas = lexemas;
+    }
+}
+
+# ------------------------------------------------------------------------------
+# MiniCompilador: parser recursivo descendente, TAC, ARMv7, tabela de simbolos
+# ------------------------------------------------------------------------------
+class MiniCompilador {
+    var lexemas = [""];
+    var pos = 0;
+    var temp_count = 1;
+    var reg_count = 0;
+    var simbolos = [""];
+    var categorias = [""];
+    var assembly = "";
+
+    # --- Analise sintatica (precedencia: * e / antes de + e -) ---------------
+    # expr   ::= termo { ("+" | "-") termo }
+    # termo  ::= fator { ("*" | "/") fator }
+    # fator  ::= NUMERO | IDENTIFICADOR | "(" expr ")"
+
+    func tem_token() {
+        return this.pos < len(this.lexemas);
+    }
+
+    func parse_expr() {
+        var no = this.parse_termo();
+        while (this.tem_token() && (this.lexemas[this.pos] == "+" || this.lexemas[this.pos] == "-")) {
+            var pai = new No();
+            pai.valor = this.lexemas[this.pos];
+            this.pos = this.pos + 1;
+            pai.esquerda = no;
+            pai.direita = this.parse_termo();
+            no = pai;
+        }
+        return no;
+    }
+
+    func parse_termo() {
+        var no = this.parse_fator();
+        while (this.tem_token() && (this.lexemas[this.pos] == "*" || this.lexemas[this.pos] == "/")) {
+            var pai = new No();
+            pai.valor = this.lexemas[this.pos];
+            this.pos = this.pos + 1;
+            pai.esquerda = no;
+            pai.direita = this.parse_fator();
+            no = pai;
+        }
+        return no;
+    }
+
+    func parse_fator() {
+        var folha = new No();
+        if (!this.tem_token()) {
+            print("[ERRO SINTATICO] Expressao incompleta: esperado numero, variavel ou '('.");
+            folha.valor = "0";
+            return folha;
+        }
+        var token = this.lexemas[this.pos];
+        this.pos = this.pos + 1;
+        if (token == "(") {
+            var no = this.parse_expr();
+            if (this.tem_token() && this.lexemas[this.pos] == ")") {
+                this.pos = this.pos + 1;                  # consome ")"
+            } else {
+                print("[ERRO SINTATICO] Esperado ')'.");
+            }
+            return no;
+        }
+        this.registrar_simbolo(token);
+        folha.valor = token;
+        return folha;
+    }
+
+    # --- Tabela de simbolos: constantes e variaveis da expressao -------------
+    func registrar_simbolo(token) {
+        if (this.eh_operador(token)) { return; }
+        for (var k = 0; k < len(this.simbolos); k = k + 1) {
+            if (this.simbolos[k] == token) { return; }
+        }
+        this.simbolos.append(token);
+        var lex = new Lexer();
+        if (lex.eh_digito(token[0])) {
+            this.categorias.append("CONST");
+        } else {
+            this.categorias.append("VAR");
+        }
+    }
+
+    func eh_operador(s) {
+        return s == "+" || s == "-" || s == "*" || s == "/";
+    }
+
+    # --- AST impressa de lado (filho direito em cima), como no Java ----------
+    func imprimir_ast(no, nivel) {
+        if (no == null) { return; }
+        this.imprimir_ast(no.direita, nivel + 1);
+        var recuo = "";
+        for (var k = 0; k < nivel; k = k + 1) { recuo = recuo + "  "; }
+        print(recuo + no.valor);
+        this.imprimir_ast(no.esquerda, nivel + 1);
+    }
+
+    # --- Codigo de tres enderecos ---------------------------------------------
+    func gerar_tac(no) {
+        if (!this.eh_operador(no.valor)) { return no.valor; }
+        var a1 = this.gerar_tac(no.esquerda);
+        var a2 = this.gerar_tac(no.direita);
+        var temp = "t" + this.temp_count;
+        this.temp_count = this.temp_count + 1;
+        print(temp + " = " + a1 + " " + no.valor + " " + a2);
+        return temp;
+    }
+
+    # --- Assembly ARMv7 (um registrador por valor intermediario) --------------
+    func emitir(linha) {
+        print(linha);
+        this.assembly = this.assembly + linha + "\n";
+    }
+
+    func formatar(no) {
+        if (!this.eh_operador(no.valor)) { return no.valor; }
+        return "(" + this.formatar(no.esquerda) + " " + no.valor + " " + this.formatar(no.direita) + ")";
+    }
+
+    func gerar_arm(no) {
+        if (!this.eh_operador(no.valor)) {
+            var r = "r" + this.reg_count;
+            this.reg_count = this.reg_count + 1;
+            this.emitir("    MOV    " + r + ", #" + no.valor);
+            return r;
+        }
+        var a1 = this.gerar_arm(no.esquerda);
+        var a2 = this.gerar_arm(no.direita);
+        var reg = "r" + this.reg_count;
+        this.reg_count = this.reg_count + 1;
+        var instr = "NOP";
+        if (no.valor == "+") { instr = "ADD"; }
+        if (no.valor == "-") { instr = "SUB"; }
+        if (no.valor == "*") { instr = "MUL"; }
+        if (no.valor == "/") {
+            this.emitir("    @ divisao nao suportada: " + a1 + " / " + a2 + "    @ resultado de '" + this.formatar(no) + "'");
+            return reg;
+        }
+        while (len(instr) < 6) { instr = instr + " "; }   # alinha como o %-6s do Java
+        this.emitir("    " + instr + " " + reg + ", " + a1 + ", " + a2 + "    @ resultado de '" + this.formatar(no) + "'");
+        return reg;
+    }
+
+    # --- Avaliacao da expressao -------------------------------------------------
+    func avaliar(no) {
+        if (!this.eh_operador(no.valor)) {
+            var lex = new Lexer();
+            if (lex.eh_digito(no.valor[0])) { return to_number(no.valor); }
+            print("[AVISO] Variavel '" + no.valor + "' nao tem valor atribuido. Usando 0.");
+            return 0.0;
+        }
+        var esq = this.avaliar(no.esquerda);
+        var dir = this.avaliar(no.direita);
+        if (no.valor == "+") { return esq + dir; }
+        if (no.valor == "-") { return esq - dir; }
+        if (no.valor == "*") { return esq * dir; }
+        if (dir == 0.0) {
+            print("[AVISO] Divisao por zero.");
+            return 0.0;
+        }
+        return esq / dir;
+    }
+
+    # --- Todas as fases para uma expressao ---------------------------------------
+    func compilar(expressao, arquivo_arm) {
+        var vazia = [""];
+        vazia.pop();
+        this.pos = 0;
+        this.temp_count = 1;
+        this.reg_count = 0;
+        this.simbolos = vazia;
+        this.categorias = vazia;
+        this.assembly = "";
+
+        print("==================================================");
+        print("Expressao infixada: " + expressao);
+
+        var lex = new Lexer();
+        lex.analisar(expressao);
+        print("");
+        print("Tokens gerados pelo analisador lexico:");
+        for (var k = 0; k < len(lex.lexemas); k = k + 1) {
+            print("[" + lex.tipos[k] + ": '" + lex.lexemas[k] + "']");
+        }
+
+        this.lexemas = lex.lexemas;
+        var raiz = this.parse_expr();
+        if (this.tem_token()) {
+            print("[ERRO SINTATICO] Sobrou texto depois da expressao: " + this.lexemas[this.pos]);
+        }
+
+        print("");
+        print("Arvore Sintatica Abstrata (AST):");
+        this.imprimir_ast(raiz, 0);
+
+        print("");
+        print("Codigo de Tres Enderecos (TAC):");
+        this.gerar_tac(raiz);
+
+        print("");
+        print("Assembly ARMv7 (CPUlator):");
+        this.emitir(".global _start");
+        this.emitir(".text");
+        this.emitir("_start:");
+        var final = this.gerar_arm(raiz);
+        this.emitir("    b .    @ loop infinito para parar o programa (resultado em " + final + ")");
+
+        print("");
+        print("Tabela de Simbolos:");
+        for (var k = 0; k < len(this.simbolos); k = k + 1) {
+            print("  " + this.simbolos[k] + " -> " + this.categorias[k]);
+        }
+
+        print("");
+        print("Resultado final da expressao:");
+        print("  " + format(this.avaliar(raiz), 1));
+
+        if (write_file(arquivo_arm, this.assembly)) {
+            print("");
+            print("Assembly gravado em: " + arquivo_arm);
+        }
+    }
+}
+
+# ------------------------------------------------------------------------------
+# Programa principal
+# ------------------------------------------------------------------------------
+var compilador = new MiniCompilador();
+var entrada = input("Digite uma expressao infixada (Enter = as 3 expressoes do Teste 11): ");
+if (entrada == "") {
+    var expressoes = ["((2+4)*7)-(5*4)", "((10 -8*7)+4)*2", "((2+4)*7)-(5*4)"];
+    for (var k = 0; k < len(expressoes); k = k + 1) {
+        compilador.compilar(expressoes[k], "output/teste11_expressao" + (k + 1) + ".arm");
+    }
+} else {
+    compilador.compilar(entrada, "output/teste11_expressao.arm");
+}

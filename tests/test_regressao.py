@@ -49,6 +49,7 @@ CONFIG: dict[str, dict] = {
     "teste4_rede_neural_xor": {"tolerancia": 0.05},
     "teste6_quicksort_classes": {"stdin": "10 -3 -40 80 70 -100\n"},
     "exemplo_fork_join": {"worker": 5001},
+    "teste11_minicompilador": {"stdin": "\n"},   # Enter: compila as 3 expressoes do Teste 11
 }
 
 # Programas que DEVEM ser rejeitados pelo compilador (erros de propósito)

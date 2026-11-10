@@ -1,0 +1,184 @@
+Expressao infixada: ((2+4)*7)-(5*4)
+
+Tokens gerados pelo analisador lexico:
+[PARENTESE: '(']
+[PARENTESE: '(']
+[NUMERO: '2']
+[OPERADOR: '+']
+[NUMERO: '4']
+[PARENTESE: ')']
+[OPERADOR: '*']
+[NUMERO: '7']
+[PARENTESE: ')']
+[OPERADOR: '-']
+[PARENTESE: '(']
+[NUMERO: '5']
+[OPERADOR: '*']
+[NUMERO: '4']
+[PARENTESE: ')']
+
+Arvore Sintatica Abstrata (AST):
+    4
+  *
+    5
+-
+    7
+  *
+      4
+    +
+      2
+
+Codigo de Tres Enderecos (TAC):
+t1 = 2 + 4
+t2 = t1 * 7
+t3 = 5 * 4
+t4 = t2 - t3
+
+Assembly ARMv7 (CPUlator):
+.global _start
+.text
+_start:
+    MOV    r0, #2
+    MOV    r1, #4
+    ADD    r2, r0, r1    @ resultado de '(2 + 4)'
+    MOV    r3, #7
+    MUL    r4, r2, r3    @ resultado de '((2 + 4) * 7)'
+    MOV    r5, #5
+    MOV    r6, #4
+    MUL    r7, r5, r6    @ resultado de '(5 * 4)'
+    SUB    r8, r4, r7    @ resultado de '(((2 + 4) * 7) - (5 * 4))'
+    b .    @ loop infinito para parar o programa (resultado em r8)
+
+Tabela de Simbolos:
+  2 -> CONST
+  4 -> CONST
+  7 -> CONST
+  5 -> CONST
+
+Resultado final da expressao:
+  22.0
+
+Assembly gravado em: output/teste11_expressao1.arm
+==================================================
+Expressao infixada: ((10 -8*7)+4)*2
+
+Tokens gerados pelo analisador lexico:
+[PARENTESE: '(']
+[PARENTESE: '(']
+[NUMERO: '10']
+[OPERADOR: '-']
+[NUMERO: '8']
+[OPERADOR: '*']
+[NUMERO: '7']
+[PARENTESE: ')']
+[OPERADOR: '+']
+[NUMERO: '4']
+[PARENTESE: ')']
+[OPERADOR: '*']
+[NUMERO: '2']
+
+Arvore Sintatica Abstrata (AST):
+  2
+*
+    4
+  +
+        7
+      *
+        8
+    -
+      10
+
+Codigo de Tres Enderecos (TAC):
+t1 = 8 * 7
+t2 = 10 - t1
+t3 = t2 + 4
+t4 = t3 * 2
+
+Assembly ARMv7 (CPUlator):
+.global _start
+.text
+_start:
+    MOV    r0, #10
+    MOV    r1, #8
+    MOV    r2, #7
+    MUL    r3, r1, r2    @ resultado de '(8 * 7)'
+    SUB    r4, r0, r3    @ resultado de '(10 - (8 * 7))'
+    MOV    r5, #4
+    ADD    r6, r4, r5    @ resultado de '((10 - (8 * 7)) + 4)'
+    MOV    r7, #2
+    MUL    r8, r6, r7    @ resultado de '(((10 - (8 * 7)) + 4) * 2)'
+    b .    @ loop infinito para parar o programa (resultado em r8)
+
+Tabela de Simbolos:
+  10 -> CONST
+  8 -> CONST
+  7 -> CONST
+  4 -> CONST
+  2 -> CONST
+
+Resultado final da expressao:
+  -84.0
+
+Assembly gravado em: output/teste11_expressao2.arm
+==================================================
+Expressao infixada: ((2+4)*7)-(5*4)
+
+Tokens gerados pelo analisador lexico:
+[PARENTESE: '(']
+[PARENTESE: '(']
+[NUMERO: '2']
+[OPERADOR: '+']
+[NUMERO: '4']
+[PARENTESE: ')']
+[OPERADOR: '*']
+[NUMERO: '7']
+[PARENTESE: ')']
+[OPERADOR: '-']
+[PARENTESE: '(']
+[NUMERO: '5']
+[OPERADOR: '*']
+[NUMERO: '4']
+[PARENTESE: ')']
+
+Arvore Sintatica Abstrata (AST):
+    4
+  *
+    5
+-
+    7
+  *
+      4
+    +
+      2
+
+Codigo de Tres Enderecos (TAC):
+t1 = 2 + 4
+t2 = t1 * 7
+t3 = 5 * 4
+t4 = t2 - t3
+
+Assembly ARMv7 (CPUlator):
+.global _start
+.text
+_start:
+    MOV    r0, #2
+    MOV    r1, #4
+    ADD    r2, r0, r1    @ resultado de '(2 + 4)'
+    MOV    r3, #7
+    MUL    r4, r2, r3    @ resultado de '((2 + 4) * 7)'
+    MOV    r5, #5
+    MOV    r6, #4
+    MUL    r7, r5, r6    @ resultado de '(5 * 4)'
+    SUB    r8, r4, r7    @ resultado de '(((2 + 4) * 7) - (5 * 4))'
+    b .    @ loop infinito para parar o programa (resultado em r8)
+
+Tabela de Simbolos:
+  2 -> CONST
+  4 -> CONST
+  7 -> CONST
+  5 -> CONST
+
+Resultado final da expressao:
+  22.0
+
+Assembly gravado em: output/teste11_expressao3.arm
