@@ -1,0 +1,28 @@
+# Programa de Teste 1 em dois computadores - CLIENTE (computador 1)
+# Le a operacao e os operandos do teclado, envia ao servidor pelo canal
+# "requisicao" e imprime o resultado recebido pelo canal "resposta".
+# Digite "fim" na operacao para encerrar cliente e servidor.
+# Portas: o servidor recebe na 5101; este computador recebe na 5102.
+
+print("==== Calculadora cliente-servidor: CLIENTE (computador 1) ====");
+print("Opcoes: +, -, *, /  (fim para sair)");
+var ip_servidor = input("IP do servidor (Enter = 127.0.0.1): ");
+if (ip_servidor == "") { ip_servidor = "127.0.0.1"; }
+
+var requisicao = c_channel(ip_servidor, 5101);
+var resposta = c_channel("0.0.0.0", 5102);
+
+while (true) {
+    var operacao = input("Operacao (+,-,*,/ ou fim): ");
+    send(requisicao, operacao);
+    if (operacao == "fim") {
+        break;
+    }
+    var operando1 = input("Operando 1: ");
+    var operando2 = input("Operando 2: ");
+    send(requisicao, operando1);
+    send(requisicao, operando2);
+    var resultado = receive(resposta);
+    print("Resultado:", resultado);
+}
+print("Calculadora encerrada.");

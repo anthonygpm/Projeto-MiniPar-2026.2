@@ -1,0 +1,40 @@
+# Programa de Teste 1 em dois computadores - SERVIDOR (computador 2)
+# Calculadora cliente-servidor: o servidor recebe a operacao e os operandos pelo
+# canal "requisicao", calcula e devolve o resultado pelo canal "resposta".
+#
+# Como executar:
+#   1. Neste computador (servidor):  teste1_servidor   e digite o IP do cliente
+#   2. No outro computador (cliente): teste1_cliente   e digite o IP deste computador
+#   (Enter vazio = 127.0.0.1, para testar os dois papeis na mesma maquina)
+# Portas: este computador recebe na 5101; o cliente recebe na 5102.
+
+func calcular(op, v1, v2) {
+    if (op == "+") { return v1 + v2; }
+    if (op == "-") { return v1 - v2; }
+    if (op == "*") { return v1 * v2; }
+    if (op == "/") { return v1 / v2; }
+    return 0.0;
+}
+
+print("==== Calculadora cliente-servidor: SERVIDOR (computador 2) ====");
+var ip_cliente = input("IP do cliente (Enter = 127.0.0.1): ");
+if (ip_cliente == "") { ip_cliente = "127.0.0.1"; }
+
+# c_channel calculadora computador_1 computador_2:
+# "requisicao" chega neste computador (porta 5101); "resposta" vai ao cliente (porta 5102)
+var requisicao = c_channel("0.0.0.0", 5101);
+var resposta = c_channel(ip_cliente, 5102);
+
+print("Aguardando operacoes do cliente...");
+while (true) {
+    var op = receive(requisicao);
+    if (op == "fim") {
+        print("Cliente encerrou a calculadora.");
+        break;
+    }
+    var s_v1 = receive(requisicao);
+    var s_v2 = receive(requisicao);
+    var res = calcular(op, to_number(s_v1), to_number(s_v2));
+    print("Servidor recebeu:", s_v1, op, s_v2, "| resultado:", res);
+    send(resposta, res);
+}
