@@ -61,6 +61,32 @@ long long __int(const T& x) {
 // floor(x): maior inteiro <= x, tambem em 64 bits (math.floor do Python)
 long long __mp_floor(double x) { return static_cast<long long>(std::floor(x)); }
 
+// Divisao real, como no Python 3: 7 / 2 vale 3.5 (nunca divisao inteira).
+// Dividir por zero encerra o programa com erro, como o ZeroDivisionError.
+template<typename A, typename B>
+double __mp_div(A a, B b) {
+    if (static_cast<double>(b) == 0.0) {
+        std::cerr << "[ERRO DE EXECUCAO] Divisao por zero." << std::endl;
+        std::exit(1);
+    }
+    return static_cast<double>(a) / static_cast<double>(b);
+}
+
+// Resto da divisao: inteiro entre inteiros (10 % 4 vale 2); com algum
+// operando real usa std::fmod (7.5 % 2 vale 1.5), como no Python.
+template<typename A, typename B>
+auto __mp_mod(A a, B b) {
+    if constexpr (std::is_integral_v<A> && std::is_integral_v<B>) {
+        if (b == 0) {
+            std::cerr << "[ERRO DE EXECUCAO] Divisao por zero." << std::endl;
+            std::exit(1);
+        }
+        return a % b;
+    } else {
+        return std::fmod(static_cast<double>(a), static_cast<double>(b));
+    }
+}
+
 // Helper para Random nativo
 double random_val() { return (double)rand() / RAND_MAX; }
 
