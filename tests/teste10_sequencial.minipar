@@ -27,7 +27,7 @@ seq {
                 zx = tmp;
                 iteracao = iteracao + 1;
             }
-            var indice = (iteracao * 8) / 100;
+            var indice = int((iteracao * 8) / 100);
             if (indice == 1) { tela[y][x] = "."; }
             if (indice == 2) { tela[y][x] = ":"; }
             if (indice == 3) { tela[y][x] = "-"; }

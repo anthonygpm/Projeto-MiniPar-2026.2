@@ -58,8 +58,12 @@ class CppCodeGenerator:
         if isinstance(node, IdentifierExpr): return node.name
         if isinstance(node, UnaryExpr): return f"({node.op}{self._translate_expression(node.operand)})"
         if isinstance(node, BinaryExpr):
-            return f"({self._translate_expression(node.left)} {node.op} {self._translate_expression(node.right)})"
-        
+            left, right = self._translate_expression(node.left), self._translate_expression(node.right)
+            # Como no Python 3: '/' é sempre divisão real (7 / 2 vale 3.5) e '%' aceita reais
+            if node.op == "/": return f"__mp_div({left}, {right})"
+            if node.op == "%": return f"__mp_mod({left}, {right})"
+            return f"({left} {node.op} {right})"
+
         if isinstance(node, NewExpr):
             args = ", ".join(self._translate_expression(a) for a in node.arguments)
             return f"std::make_shared<{node.class_name}>({args})"

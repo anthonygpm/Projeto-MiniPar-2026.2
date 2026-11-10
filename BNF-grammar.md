@@ -787,8 +787,10 @@ Representa inteiros e ponto flutuante. No C++ gerado, literais inteiros são de 
 (`long long`, ex.: `42` vira `42LL`) e literais com ponto são `double`. Assim, somas longas
 e o gerador LCG dos testes 8–10 (`estado * 1103515245 + 12345`) não estouram 32 bits.
 
-> Atenção: `/` entre dois inteiros faz divisão inteira no C++ gerado (`7 / 2` vale `3`).
-> Para divisão real, use um operando com ponto: `7 / 2.0`.
+A divisão `/` é sempre real, como no Python 3: `7 / 2` vale `3.5`, mesmo entre inteiros.
+Para o quociente inteiro, use `int(7 / 2)` ou `floor(7 / 2)`. O resto `%` é inteiro entre
+inteiros e usa `fmod` quando há um operando real (`7.5 % 2` vale `1.5`). Dividir por zero
+encerra o programa com `[ERRO DE EXECUCAO] Divisao por zero.`
 
 **Exemplos:** `0`, `42`, `3.14`, `0.5`
 
@@ -1152,6 +1154,7 @@ O analisador semântico (`src/semantic.py`) usa inferência simples de tipos com
 | `["a", "b"]` | `std::vector<std::string>{...}` |
 | `var l = []; ... l.append(v);` | `std::vector<T>` com `T` deduzido do primeiro `append` (números: `double`) |
 | `lista[i]` | `__index(lista, i)` (confere os limites) |
+| `a / b` · `a % b` | `__mp_div(a, b)` (sempre `double`) · `__mp_mod(a, b)` (`%` ou `std::fmod`) |
 | `fork f(a) on core(n)` | `__fork(n, [__a0 = a]() { return f(__a0); })`: `std::thread` + `std::promise`/`std::future`, fixada no núcleo `n` (`SetThreadAffinityMask` no Windows, `pthread_setaffinity_np` no Linux) |
 | `fork f(a)` | `__fork(0, ...)`: o sistema operacional escolhe o núcleo |
 | `join t` | `__join(t)`: espera a thread e devolve o valor do `future` |
