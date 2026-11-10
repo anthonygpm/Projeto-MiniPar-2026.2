@@ -1,0 +1,43 @@
+# Recursos do Teste 11: literal null (arvore com filhos vazios) e write_file
+class No {
+    var valor = "";
+    var esquerda = null;
+    var direita = null;
+}
+
+class Arvore {
+    func folha(v) {
+        var n = new No();
+        n.valor = v;
+        return n;
+    }
+    func op(v, e, d) {
+        var n = new No();
+        n.valor = v;
+        n.esquerda = e;
+        n.direita = d;
+        return n;
+    }
+    func avaliar(n) {
+        if (n.esquerda == null) { return to_number(n.valor); }
+        var a = this.avaliar(n.esquerda);
+        var b = this.avaliar(n.direita);
+        if (n.valor == "+") { return a + b; }
+        if (n.valor == "-") { return a - b; }
+        return a * b;
+    }
+    func contar(n) {
+        if (n == null) { return 0; }
+        return 1 + this.contar(n.esquerda) + this.contar(n.direita);
+    }
+}
+
+var arv = new Arvore();
+var raiz = arv.op("-", arv.op("*", arv.op("+", arv.folha("2"), arv.folha("4")), arv.folha("7")), arv.op("*", arv.folha("5"), arv.folha("4")));
+print("resultado:", arv.avaliar(raiz));
+print("nos:", arv.contar(raiz));
+var vazio = null;
+if (vazio == null) { print("vazio e null"); }
+vazio = new No();
+if (vazio != null) { print("agora tem objeto"); }
+if (write_file("output/teste_null_write_file.arm", "MOV r0, #1\n")) { print("arquivo gravado"); }

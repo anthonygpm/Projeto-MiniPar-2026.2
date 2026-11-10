@@ -1,0 +1,5 @@
+resultado: 22
+nos: 9
+vazio e null
+agora tem objeto
+arquivo gravado
