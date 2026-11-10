@@ -42,10 +42,13 @@ from codegen import CppCodeGenerator  # noqa: E402
 #                O Teste 4 usa pesos iniciais aleatórios no Python do enunciado,
 #                então os valores previstos só podem bater aproximadamente.
 #   timeout    : segundos de execução antes de considerar travado
+#   worker     : porta de um worker ("programa --worker <porta>") iniciado antes,
+#                para programas com fork ... on host(...)
 # ----------------------------------------------------------------------
 CONFIG: dict[str, dict] = {
     "teste4_rede_neural_xor": {"tolerancia": 0.05},
     "teste6_quicksort_classes": {"stdin": "10 -3 -40 80 70 -100\n"},
+    "exemplo_fork_join": {"worker": 5001},
 }
 
 # Programas que DEVEM ser rejeitados pelo compilador (erros de propósito)
@@ -184,7 +187,17 @@ def test_saida_esperada(nome: str) -> None:
     assert r.returncode == 0, f"Falha ao compilar {programa}:\n{r.stdout}\n{r.stderr}"
 
     stdin = cfg.get("stdin", "")
-    exe = executar(programa, stdin=stdin, timeout=cfg.get("timeout", 60))
+    worker = None
+    if "worker" in cfg:   # o mesmo executável faz o papel do outro computador
+        exe_path = OUTPUT_DIR / (PREFIX + programa.replace("/", "_") + CppCodeGenerator.executable_suffix())
+        worker = subprocess.Popen([str(exe_path), "--worker", str(cfg["worker"])], cwd=ROOT,
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        exe = executar(programa, stdin=stdin, timeout=cfg.get("timeout", 60))
+    finally:
+        if worker:
+            worker.kill()
+            worker.wait()
     assert exe.returncode == 0, f"{nome} terminou com código {exe.returncode}:\n{exe.stderr}"
 
     esperado = normalizar((EXPECTED_DIR / f"{nome}.expected.txt").read_text(encoding="utf-8"))

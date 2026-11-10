@@ -1,0 +1,32 @@
+# Casos de Fork/Join em nucleos da CPU (saida conferida pela regressao)
+class Contador {
+    var base = 100;
+    func somar(x) { return this.base + x; }
+    func paralelo() {
+        var t = fork this.somar(5) on core(1);
+        return join t;
+    }
+}
+func dobro(x) { return x * 2; }
+func saudacao(nome) { return "Ola, " + nome; }
+func nada() { print("subtarefa sem retorno"); }
+func pai(k) {
+    var t = fork dobro(k) on core(2);
+    return join t;
+}
+var c = new Contador();
+var tm = fork c.somar(1);
+print("metodo:", join tm);
+print("this:", c.paralelo());
+print("pai:", pai(21));
+var ts = fork saudacao("MiniPar") on core(3);
+print(join ts);
+var tv = fork nada();
+join tv;
+var lista = [fork dobro(1), fork dobro(2)];
+var soma = 0;
+for (var t in lista) { soma = soma + join t; }
+print("lista literal:", soma);
+var x = join lista[0] * 10;
+print("expressao:", x);
+if (join lista[1] > 3) { print("comparacao ok"); }

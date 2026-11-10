@@ -1,0 +1,42 @@
+# Demonstracao de Fork/Join entre computadores (MiniPar 2026.2)
+#
+# Como executar:
+#   1. Compile este programa nos DOIS computadores.
+#   2. No computador 2 (servidor):   demo_host --worker 5001
+#   3. No computador 1 (principal):  demo_host   e digite o IP do computador 2
+#      (Enter vazio = 127.0.0.1, para testar os dois papeis na mesma maquina)
+#
+# Metade do trabalho roda nos nucleos do computador 1 e metade e enviada ao
+# computador 2. O join espera as quatro subtarefas e junta os resultados.
+
+func carga(id, n) {
+    var soma = 0;
+    for (var i = 0; i < n; i = i + 1) {
+        soma = soma + (i * i) % 7;
+    }
+    return soma;
+}
+
+func relatorio(avaliador, alunos) {
+    var texto = "";
+    for (var a = 1; a <= alunos; a = a + 1) {
+        texto = texto + "[" + avaliador + "] Concluiu: Aluno " + format(a, 0) + "\n";
+    }
+    return texto;
+}
+
+var ip = input("IP do computador 2 (Enter = 127.0.0.1): ");
+if (ip == "") { ip = "127.0.0.1"; }
+var N = 200000000;
+
+var inicio = clock();
+var t1 = fork carga(1, N) on core(1);
+var t2 = fork carga(2, N) on core(2);
+var t3 = fork carga(3, N) on host(ip, 5001);
+var t4 = fork carga(4, N) on host(ip, 5001);
+var t5 = fork relatorio("Monitor remoto", 3) on host(ip, 5001);
+
+var total = join t1 + join t2 + join t3 + join t4;
+print("Total das 4 subtarefas:", total);
+print(join t5);
+print("Tempo:", format(clock() - inicio, 2), "s");

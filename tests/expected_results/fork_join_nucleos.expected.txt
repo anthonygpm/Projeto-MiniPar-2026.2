@@ -1,0 +1,8 @@
+metodo: 101
+this: 105
+pai: 42
+Ola, MiniPar
+subtarefa sem retorno
+lista literal: 6
+expressao: 20
+comparacao ok

@@ -1,0 +1,40 @@
+# Demonstracao de Fork/Join em nucleos da CPU (MiniPar 2026.2)
+# A mesma carga de trabalho roda primeiro em sequencia (1 nucleo) e depois
+# dividida em 4 subtarefas (fork), uma por nucleo. O join junta os resultados.
+
+func carga(id, n) {
+    # Trabalho pesado de CPU: soma de i*i % 7 para i em [0, n)
+    var soma = 0;
+    for (var i = 0; i < n; i = i + 1) {
+        soma = soma + (i * i) % 7;
+    }
+    return soma;
+}
+
+var N = 200000000;
+var PARTES = 4;
+
+print("--- 1. Modo Sequencial (1 nucleo) ---");
+var inicio = clock();
+var total_seq = 0;
+for (var k = 0; k < PARTES; k = k + 1) {
+    total_seq = total_seq + carga(k, N);
+}
+var tempo_seq = clock() - inicio;
+print("Resultado:", total_seq, "| Tempo:", format(tempo_seq, 2), "s");
+
+print("--- 2. Modo Paralelo (4 nucleos, fork/join) ---");
+inicio = clock();
+var tarefas = [];
+for (var k = 0; k < PARTES; k = k + 1) {
+    tarefas.append(fork carga(k, N) on core(k + 1));
+}
+var total_par = 0;
+for (var t in tarefas) {
+    total_par = total_par + join t;
+}
+var tempo_par = clock() - inicio;
+print("Resultado:", total_par, "| Tempo:", format(tempo_par, 2), "s");
+
+print("Aceleracao:", format(tempo_seq / tempo_par, 2), "x");
+if (total_seq == total_par) { print("Resultados iguais: OK"); }
