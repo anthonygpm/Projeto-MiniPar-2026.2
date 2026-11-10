@@ -21,6 +21,11 @@ class BoolExpr(ASTNode):
     line: int = 1
 
 @dataclass
+class NullExpr(ASTNode):
+    """Literal null (2026.2): referência a objeto ausente, ex.: filho vazio de um nó da AST."""
+    line: int = 1
+
+@dataclass
 class IdentifierExpr(ASTNode):
     name: str
     line: int = 1

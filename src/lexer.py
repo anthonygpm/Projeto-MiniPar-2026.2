@@ -8,6 +8,7 @@ class TokenType(Enum):
     NUMBER         = auto()
     STRING_LITERAL = auto()
     BOOL_LITERAL   = auto()
+    NULL           = auto()   # null (2026.2)
     CLASS     = auto()
     EXTENDS   = auto()
     NEW       = auto()
@@ -96,6 +97,7 @@ KEYWORDS: dict[str, TokenType] = {
     "host":      TokenType.HOST,
     "true":      TokenType.BOOL_LITERAL,
     "false":     TokenType.BOOL_LITERAL,
+    "null":      TokenType.NULL,
     "number":    TokenType.TYPE,
     "int":       TokenType.TYPE,
     "string":    TokenType.TYPE,

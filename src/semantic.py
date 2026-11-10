@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 from ast_nodes import (
     ASTNode, Program, VarDecl, Assignment, PrintStmt, IdentifierExpr, BinaryExpr,
-    UnaryExpr, NumberExpr, StringExpr, BoolExpr, SeqBlock, ParBlock, IfStmt, WhileStmt,
+    UnaryExpr, NumberExpr, StringExpr, BoolExpr, NullExpr, SeqBlock, ParBlock, IfStmt, WhileStmt,
     DoWhileStmt, ForStmt, BreakStmt, ContinueStmt, InputExpr,
     ClassDecl, FuncDecl, ReturnStmt, MethodCall, FuncCallExpr, PropertyAccess, PropertyAssign, NewExpr, ThisExpr,
     CChannelExpr, SendStmt, ReceiveExpr, ListLiteral, MatrixCreateExpr, IndexExpr, IndexAssign,
@@ -15,6 +15,7 @@ from ast_nodes import (
 _BUILTINS = {
     "exp": 1, "random": 0, "range": None, "len": 1, "to_number": 1, "parse_ints": 1,
     "format": 2, "clock": 0, "int": 1, "floor": 1,
+    "write_file": 2,   # write_file(caminho, texto): grava o texto num arquivo (2026.2)
 }
 
 # Tipos que podem viajar pela rede num fork ... on host(...)
@@ -80,6 +81,7 @@ class SemanticAnalyzer:
         if isinstance(node, NumberExpr): return "number"
         if isinstance(node, StringExpr): return "string"
         if isinstance(node, BoolExpr): return "bool"
+        if isinstance(node, NullExpr): return "null"
         if isinstance(node, InputExpr): return "string"
         if isinstance(node, CChannelExpr): return "c_channel"
         if isinstance(node, ReceiveExpr): return "string"
@@ -119,6 +121,10 @@ class SemanticAnalyzer:
 
     def _types_compatible(self, declared: str, actual: str) -> bool:
         if declared in ("var", "unknown") or actual == "unknown": return True
+        # null vale como referência a qualquer objeto, e uma variável iniciada com null
+        # pode depois receber um objeto (nunca um número, texto ou bool)
+        if actual == "null": return declared not in ("number", "int", "string", "bool")
+        if declared == "null": return actual not in ("number", "int", "string", "bool")
         if declared == "int" and actual == "number": return True
         if declared == "number" and actual == "int": return True
         return declared == actual

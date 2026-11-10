@@ -71,8 +71,8 @@ _LOCK = threading.Lock()
 
 FASES = ("tokens", "ast", "semantic", "tac", "cpp")
 
-_KEYWORD_TYPES = {t.name for t in KEYWORDS.values()} - {"BOOL_LITERAL", "TYPE"}
-_LITERAIS = {"NUMBER", "STRING_LITERAL", "BOOL_LITERAL"}
+_KEYWORD_TYPES = {t.name for t in KEYWORDS.values()} - {"BOOL_LITERAL", "NULL", "TYPE"}
+_LITERAIS = {"NUMBER", "STRING_LITERAL", "BOOL_LITERAL", "NULL"}
 _DELIMITADORES = {"LPAREN", "RPAREN", "LBRACE", "RBRACE", "LBRACKET", "RBRACKET",
                   "DOT", "SEMICOLON", "COMMA"}
 

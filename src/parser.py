@@ -4,7 +4,7 @@ from typing import List
 from lexer import Token, TokenType
 from ast_nodes import (
     ASTNode, Program, VarDecl, Assignment, PrintStmt, SeqBlock, ParBlock, 
-    BinaryExpr, UnaryExpr, NumberExpr, StringExpr, BoolExpr, IdentifierExpr, IfStmt, WhileStmt,
+    BinaryExpr, UnaryExpr, NumberExpr, StringExpr, BoolExpr, NullExpr, IdentifierExpr, IfStmt, WhileStmt,
     DoWhileStmt, ForStmt, BreakStmt, ContinueStmt, InputExpr,
     ClassDecl, FuncDecl, ReturnStmt, MethodCall, FuncCallExpr, PropertyAccess, PropertyAssign, NewExpr, ThisExpr,
     CChannelExpr, SendStmt, ReceiveExpr, ListLiteral, MatrixCreateExpr, IndexExpr, IndexAssign,
@@ -404,6 +404,8 @@ class Parser:
             node = StringExpr(value=tok.lexeme, line=tok.line)
         elif self._match(TokenType.BOOL_LITERAL):
             node = BoolExpr(value=(tok.lexeme == "true"), line=tok.line)
+        elif self._match(TokenType.NULL):
+            node = NullExpr(line=tok.line)
         elif self._match(TokenType.IDENTIFIER) or self._match_cast_call():
             name = tok.lexeme
             if self._match(TokenType.LPAREN):

@@ -3,7 +3,7 @@ import os
 from typing import Optional
 from ast_nodes import (
     ASTNode, Program, VarDecl, Assignment, PrintStmt, SeqBlock, ParBlock, BinaryExpr,
-    UnaryExpr, NumberExpr, StringExpr, BoolExpr, IdentifierExpr, IfStmt, WhileStmt,
+    UnaryExpr, NumberExpr, StringExpr, BoolExpr, NullExpr, IdentifierExpr, IfStmt, WhileStmt,
     DoWhileStmt, ForStmt, BreakStmt, ContinueStmt, InputExpr,
     ClassDecl, FuncDecl, ReturnStmt, MethodCall, FuncCallExpr, PropertyAccess, PropertyAssign, NewExpr, ThisExpr,
     CChannelExpr, SendStmt, ReceiveExpr, ListLiteral, MatrixCreateExpr, IndexExpr, IndexAssign,
@@ -103,6 +103,7 @@ class TACGenerator:
         if isinstance(node, NumberExpr): return node.value
         if isinstance(node, StringExpr): return f'"{node.value}"'
         if isinstance(node, BoolExpr): return "true" if node.value else "false"
+        if isinstance(node, NullExpr): return "null"
         if isinstance(node, IdentifierExpr): return node.name
         if isinstance(node, ThisExpr): return "this"
         if isinstance(node, UnaryExpr):
