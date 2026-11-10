@@ -51,7 +51,7 @@ long long __int(const T& x) {
 }
 
 // floor(x): maior inteiro <= x, tambem em 64 bits (math.floor do Python)
-long long __floor(double x) { return static_cast<long long>(std::floor(x)); }
+long long __mp_floor(double x) { return static_cast<long long>(std::floor(x)); }
 
 // Helper para Random nativo
 double random_val() { return (double)rand() / RAND_MAX; }

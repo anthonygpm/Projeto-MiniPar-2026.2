@@ -92,7 +92,7 @@ class CppCodeGenerator:
             if node.name == "int":
                 return f"__int({args})"
             if node.name == "floor":
-                return f"__floor({args})"
+                return f"__mp_floor({args})"
             return f"{node.name}({args})"
 
         if isinstance(node, CChannelExpr):

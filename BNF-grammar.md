@@ -1159,7 +1159,7 @@ O analisador semântico (`src/semantic.py`) usa inferência simples de tipos com
 | `len(x)` | `x.size()` |
 | `range(n)` | `__minipar_range(n)` |
 | `input(p)` | `input(p)` (helper C++) |
-| `format(x, n)` / `clock()` / `int(x)` / `floor(x)` | `__format` / `__clock` / `__int` / `__floor` |
+| `format(x, n)` / `clock()` / `int(x)` / `floor(x)` | `__format` / `__clock` / `__int` / `__mp_floor` |
 
 ---
 
