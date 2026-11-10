@@ -5,7 +5,7 @@ import sys
 from typing import Optional
 from ast_nodes import (
     ASTNode, Program, VarDecl, Assignment, PrintStmt, SeqBlock, ParBlock, BinaryExpr, 
-    UnaryExpr, NumberExpr, StringExpr, BoolExpr, IdentifierExpr, IfStmt, WhileStmt,
+    UnaryExpr, NumberExpr, StringExpr, BoolExpr, NullExpr, IdentifierExpr, IfStmt, WhileStmt,
     DoWhileStmt, ForStmt, BreakStmt, ContinueStmt, InputExpr,
     ClassDecl, FuncDecl, ReturnStmt, MethodCall, FuncCallExpr, PropertyAccess, PropertyAssign, NewExpr, ThisExpr,
     CChannelExpr, SendStmt, ReceiveExpr, ListLiteral, MatrixCreateExpr, IndexExpr, IndexAssign,
@@ -30,6 +30,21 @@ class CppCodeGenerator:
         self._in_method = False
         # Funções enviadas a outro computador (fork ... on host): ganham registro no worker
         self._host_functions: set[str] = set()
+
+    def _null_ref_type(self, name: str, default_class: str | None) -> str:
+        """Tipo C++ de um campo/variável iniciado com null (2026.2).
+
+        Procura no programa uma atribuição de objeto a esse nome
+        (`x = new C()` ou `obj.x = new C()`) e usa a classe encontrada; sem
+        isso, um campo de classe vira referência à própria classe (caso da
+        árvore: `var esquerda = null;` dentro de `class No`).
+        """
+        for n in _walk(self._program.statements):
+            if isinstance(n, (Assignment, PropertyAssign)) and isinstance(n.value, NewExpr):
+                alvo = n.name if isinstance(n, Assignment) else n.property_name
+                if alvo == name:
+                    return f"std::shared_ptr<{n.value.class_name}>"
+        return f"std::shared_ptr<{default_class}>" if default_class else "std::shared_ptr<void>"
 
     def _scan_host_forks(self, program: Program) -> None:
         for n in _walk(program.statements):
@@ -81,6 +96,7 @@ class CppCodeGenerator:
         # std::string (e não const char*): permite concatenar com + e indexar s[i]
         if isinstance(node, StringExpr): return f'std::string("{self._escape_string(node.value)}")'
         if isinstance(node, BoolExpr): return "true" if node.value else "false"
+        if isinstance(node, NullExpr): return "nullptr"
         if isinstance(node, IdentifierExpr): return node.name
         if isinstance(node, UnaryExpr): return f"({node.op}{self._translate_expression(node.operand)})"
         if isinstance(node, BinaryExpr):
@@ -124,6 +140,8 @@ class CppCodeGenerator:
                 return f"__int({args})"
             if node.name == "floor":
                 return f"__mp_floor({args})"
+            if node.name == "write_file":
+                return f"__write_file({args})"
             return f"{node.name}({args})"
 
         if isinstance(node, CChannelExpr):
@@ -310,6 +328,8 @@ class CppCodeGenerator:
     def _translate_statement(self, node: Optional[ASTNode], indent: str = "") -> str:
         if node is None: return ""
         if isinstance(node, VarDecl):
+            if isinstance(node.init_value, NullExpr):
+                return f"{indent}{self._null_ref_type(node.name, None)} {node.name} = nullptr;\n"
             expr = self._translate_expression(node.init_value) if node.init_value else "0"
             return f"{indent}auto {node.name} = {expr};\n"
         if isinstance(node, Assignment):
@@ -409,13 +429,16 @@ class CppCodeGenerator:
     def generate(self, program: Program, output_name: str) -> bool:
         cpp_code = _CPP_HEADER
         self._host_functions = set()        # estado limpo a cada compilação (a IDE reutiliza o gerador)
+        self._program = program
         self._scan_host_forks(program)
 
         for node in program.statements:
             if isinstance(node, ClassDecl):
                 cpp_code += f"class {node.name}" + (f" : public {node.superclass}" if node.superclass else "") + " {\npublic:\n"
                 for attr in node.attributes:
-                    if attr.init_value:
+                    if isinstance(attr.init_value, NullExpr):
+                        cpp_code += f"    {self._null_ref_type(attr.name, node.name)} {attr.name} = nullptr;\n"
+                    elif attr.init_value:
                         init = self._translate_expression(attr.init_value)
                         cpp_code += f"    decltype({init}) {attr.name} = {init};\n"
                     else:

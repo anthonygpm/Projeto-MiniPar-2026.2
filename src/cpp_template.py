@@ -2,6 +2,7 @@ _CPP_HEADER = """\
 #include <iostream>
 #include <string>
 #include <sstream>
+#include <fstream>
 #include <vector>
 #include <thread>
 #include <memory>
@@ -151,6 +152,20 @@ std::string __to_string(const T& val) {
     } else {
         return std::to_string(val);
     }
+}
+
+// write_file(caminho, texto): grava o texto no arquivo (cria ou substitui).
+// Devolve true se gravou; em caso de falha avisa e devolve false.
+template<typename T>
+bool __write_file(const std::string& caminho, const T& conteudo) {
+    std::ofstream arq(caminho, std::ios::binary);
+    if (!arq) {
+        std::cerr << "[ERRO DE EXECUCAO] Nao foi possivel gravar o arquivo '" << caminho << "'." << std::endl;
+        return false;
+    }
+    if constexpr (std::is_constructible_v<std::string, T>) arq << std::string(conteudo);
+    else arq << conteudo;
+    return static_cast<bool>(arq);
 }
 
 template<typename T>
