@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MiniPar Didático</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
     <link rel="stylesheet" href="/static/css/didatico.css">
 </head>
 <body>
@@ -13,33 +14,102 @@
             <select id="test-select" aria-label="Carregar programa de teste">
                 <option value="">Carregar teste…</option>
             </select>
+            <button id="btn-analisar" class="btn primario" title="Ctrl+Enter">▶ Analisar</button>
             <a href="/" class="link">Ir para a Web 1</a>
         </nav>
     </header>
 
+    <!-- Linha do tempo das fases: mostra até onde o programa chegou -->
+    <ol id="pipeline" class="pipeline" aria-label="Fases do compilador">
+        <li data-fase="tokens">Léxica</li>
+        <li data-fase="ast">Sintática</li>
+        <li data-fase="semantic">Semântica</li>
+        <li data-fase="tac">TAC</li>
+        <li data-fase="cpp">C++</li>
+    </ol>
+
     <main class="area">
-        <section class="painel">
-            <div class="painel-titulo">Código-fonte (MiniPar)</div>
-            <textarea id="code" spellcheck="false" placeholder="Escreva ou carregue um programa MiniPar…"></textarea>
-            <div class="painel-titulo">Entrada (stdin) para input()</div>
-            <textarea id="stdin" class="stdin" spellcheck="false" placeholder="Uma resposta por linha"></textarea>
+        <section class="painel painel-editor">
+            <div class="painel-titulo">
+                <span>Código-fonte (MiniPar)</span>
+                <span id="cursor-pos" class="muted"></span>
+            </div>
+            <div class="editor-wrap"><textarea id="code"></textarea></div>
         </section>
 
-        <section class="painel">
-            <div class="fases" role="tablist">
-                <button class="fase ativa" data-rota="/api/tokens">1. Tokens</button>
-                <button class="fase" data-rota="/api/ast">2. AST</button>
-                <button class="fase" data-rota="/api/semantic">3. Semântica</button>
-                <button class="fase" data-rota="/api/tac">4. TAC</button>
-                <button class="fase" data-rota="/api/cpp">5. C++</button>
-                <button class="fase" data-rota="/api/run">6. Executar</button>
-                <button class="fase" data-rota="/api/build" data-download="1">⬇ Executável</button>
+        <section class="painel painel-fases">
+            <div class="abas" role="tablist">
+                <button class="aba ativa" role="tab" data-aba="tokens">Tokens</button>
+                <button class="aba" role="tab" data-aba="ast">AST</button>
+                <button class="aba" role="tab" data-aba="semantica">Semântica <span id="badge-erros" class="badge" hidden></span></button>
+                <button class="aba" role="tab" data-aba="tac">TAC</button>
+                <button class="aba" role="tab" data-aba="cpp">C++</button>
+                <button class="aba" role="tab" data-aba="executar">Executar</button>
             </div>
-            <div id="status" class="status">Escolha uma fase.</div>
-            <pre id="saida" class="saida"></pre>
+            <div id="status" class="status">Escreva ou carregue um programa e clique em Analisar.</div>
+
+            <!-- l5: tokens -->
+            <div class="conteudo ativo" id="aba-tokens">
+                <p class="ajuda">O <b>analisador léxico</b> quebra o texto em <b>tokens</b>. Clique numa categoria para filtrar e destacar no editor; passe o mouse numa linha para ver o token no código.</p>
+                <div id="tok-categorias" class="chips"></div>
+                <div class="tabela-wrap">
+                    <table class="tabela" id="tok-tabela">
+                        <thead><tr><th>#</th><th>Lexema</th><th>Tipo</th><th>Categoria</th><th>Linha:Col</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- l6: AST -->
+            <div class="conteudo" id="aba-ast">
+                <p class="ajuda">O <b>analisador sintático</b> monta a <b>árvore sintática abstrata</b>. Clique num nó para recolher ou expandir; arraste para mover e use a roda do mouse para zoom.</p>
+                <div class="barra">
+                    <button class="btn" id="ast-expandir">Expandir tudo</button>
+                    <button class="btn" id="ast-recolher">Recolher em comandos</button>
+                    <button class="btn" id="ast-centralizar">Centralizar</button>
+                </div>
+                <div id="ast-arvore" class="ast-arvore"></div>
+            </div>
+
+            <!-- l7: semântica -->
+            <div class="conteudo" id="aba-semantica">
+                <p class="ajuda">O <b>analisador semântico</b> confere o significado: declarações, tipos, aridade, fork/join. Clique num cartão para ir à linha.</p>
+                <div id="sem-erros" class="cartoes"></div>
+                <h3 class="subtitulo">Tabela de símbolos por escopo</h3>
+                <div id="sem-escopos" class="escopos"></div>
+            </div>
+
+            <!-- l8: TAC e C++ -->
+            <div class="conteudo" id="aba-tac">
+                <p class="ajuda"><b>Código de três endereços</b>: cada instrução tem no máximo um operador. <code>t0, t1…</code> são temporários e <code>L0, L1…</code> são rótulos de desvio.</p>
+                <div class="codigo-wrap"><textarea id="tac-view"></textarea></div>
+            </div>
+            <div class="conteudo" id="aba-cpp">
+                <p class="ajuda">Código <b>C++20</b> gerado a partir da AST e compilado com <code>g++ -O3</code>.</p>
+                <div class="barra">
+                    <div id="cpp-status" class="status-inline"></div>
+                    <label class="rotulo" style="margin-left:auto"><input type="checkbox" id="cpp-runtime"> mostrar o runtime (cabeçalho fixo)</label>
+                </div>
+                <div class="codigo-wrap"><textarea id="cpp-view"></textarea></div>
+            </div>
+
+            <div class="conteudo" id="aba-executar">
+                <p class="ajuda">Compila e executa. Cada linha da entrada responde a um <code>input()</code>, na ordem.</p>
+                <label class="rotulo" for="stdin">Entrada (stdin)</label>
+                <textarea id="stdin" class="stdin" spellcheck="false" placeholder="Uma resposta por linha"></textarea>
+                <div class="barra">
+                    <button class="btn primario" id="btn-executar">▶ Compilar e executar</button>
+                    <button class="btn" id="btn-baixar">⬇ Baixar executável</button>
+                </div>
+                <pre id="exec-saida" class="saida"></pre>
+            </div>
         </section>
     </main>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/mode/simple.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/clike/clike.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
     <script src="/static/js/didatico.js"></script>
 </body>
 </html>
