@@ -13,10 +13,36 @@ from ast_nodes import (
 )
 from cpp_template import _CPP_HEADER
 
+
+def _walk(node):
+    """Percorre todos os nós da AST (inclusive dentro de listas)."""
+    if isinstance(node, list):
+        for item in node: yield from _walk(item)
+        return
+    if not isinstance(node, ASTNode): return
+    yield node
+    for value in vars(node).values(): yield from _walk(value)
+
+
 class CppCodeGenerator:
     def __init__(self) -> None:
         # Dentro de um método: as lambdas do fork precisam capturar 'this'
         self._in_method = False
+        # Funções enviadas a outro computador (fork ... on host): ganham registro no worker
+        self._host_functions: set[str] = set()
+
+    def _scan_host_forks(self, program: Program) -> None:
+        for n in _walk(program.statements):
+            if isinstance(n, ForkExpr) and isinstance(n.destination, HostTarget) and isinstance(n.call, FuncCallExpr):
+                self._host_functions.add(n.call.name)
+
+    @staticmethod
+    def _host_functor(name: str) -> str:
+        """Objeto-função que o worker usa para chamar `name` com os tipos recebidos."""
+        return (f"struct __mp_fn_{name} {{\n"
+                f"    static constexpr const char* name = \"{name}\";\n"
+                f"    template<typename... A> auto operator()(A&&... a) const {{ return {name}(std::forward<A>(a)...); }}\n"
+                f"}};\n\n")
 
     @staticmethod
     def executable_suffix() -> str:
@@ -121,6 +147,9 @@ class CppCodeGenerator:
             # ["Professor", "Monitor 1"] é lista de textos; as demais seguem numéricas
             if node.elements and all(isinstance(e, StringExpr) for e in node.elements):
                 return f"std::vector<std::string>{{{elems}}}"
+            # [fork f(1), fork f(2)]: lista de tarefas (o tipo vem dos próprios elementos)
+            if node.elements and all(isinstance(e, ForkExpr) for e in node.elements):
+                return f"std::vector{{{elems}}}"
             return f"std::vector<double>{{{elems}}}"
         if isinstance(node, MatrixCreateExpr):
             r = self._translate_expression(node.rows)
@@ -162,10 +191,12 @@ class CppCodeGenerator:
         if isinstance(dest, CoreTarget):
             core = self._translate_expression(dest.index)
         elif isinstance(dest, HostTarget):
-            # Execução em outro computador ainda não gerada: roda localmente
-            print(f"[AVISO CODEGEN] Linha {node.line}: fork ... on host(...) ainda executa localmente "
-                  f"(o envio a outro computador nao foi implementado).")
-            core = "0LL"
+            # Outro computador: o worker (mesmo executável com --worker <porta>) executa a função.
+            # O semântico garante que é uma função do programa com argumentos serializáveis.
+            ip = self._translate_expression(dest.ip)
+            port = self._translate_expression(dest.port)
+            host_args = "".join(f", {self._translate_expression(a)}" for a in call.arguments)
+            return f"__fork_host<__mp_fn_{call.name}>({ip}, {port}{host_args})"
         else:
             core = "0LL"   # sem destino: o sistema operacional escolhe o núcleo
         return f"__fork({core}, [{', '.join(captures)}]() {{ return {body}; }})"
@@ -377,7 +408,9 @@ class CppCodeGenerator:
 
     def generate(self, program: Program, output_name: str) -> bool:
         cpp_code = _CPP_HEADER
-        
+        self._host_functions = set()        # estado limpo a cada compilação (a IDE reutiliza o gerador)
+        self._scan_host_forks(program)
+
         for node in program.statements:
             if isinstance(node, ClassDecl):
                 cpp_code += f"class {node.name}" + (f" : public {node.superclass}" if node.superclass else "") + " {\npublic:\n"
@@ -402,8 +435,12 @@ class CppCodeGenerator:
                 cpp_code += f"{ret} {node.name}({params}) {{\n"
                 cpp_code += self._translate_body(node.body, "    ")
                 cpp_code += "}\n\n"
+                if node.name in self._host_functions:
+                    cpp_code += self._host_functor(node.name)
 
-        cpp_code += "int main() {\n    #ifdef _WIN32\n        WSADATA wsa;\n        WSAStartup(MAKEWORD(2,2), &wsa);\n    #endif\n\n"
+        cpp_code += "int main(int argc, char** argv) {\n    #ifdef _WIN32\n        WSADATA wsa;\n        WSAStartup(MAKEWORD(2,2), &wsa);\n    #endif\n\n"
+        # "programa --worker 5001": atende forks vindos de outro computador e não roda o programa
+        cpp_code += "    if (int __w = __mp_worker_from_args(argc, argv); __w >= 0) return __w;\n\n"
         # Comandos globais viram o corpo do main (um seq { } global é aberto no mesmo nível)
         main_stmts = []
         for node in program.statements:
