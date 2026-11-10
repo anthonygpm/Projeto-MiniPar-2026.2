@@ -1154,7 +1154,10 @@ O analisador semântico (`src/semantic.py`) usa inferência simples de tipos com
 | `lista[i]` | `__index(lista, i)` (confere os limites) |
 | `fork f(a) on core(n)` | `__fork(n, [__a0 = a]() { return f(__a0); })`: `std::thread` + `std::promise`/`std::future`, fixada no núcleo `n` (`SetThreadAffinityMask` no Windows, `pthread_setaffinity_np` no Linux) |
 | `fork f(a)` | `__fork(0, ...)`: o sistema operacional escolhe o núcleo |
+| `fork f(a) on host(ip, p)` | `__fork_host<__mp_fn_f>(ip, p, a)`: uma thread local envia `f(tipos)` e os argumentos (serializados) ao worker em `ip:p`, que executa e devolve o resultado; a tarefa é do mesmo tipo de um `__fork` |
+| `[fork f(1), fork f(2)]` | `std::vector{...}` (lista de tarefas) |
 | `join t` | `__join(t)`: espera a thread e devolve o valor do `future` |
+| `programa --worker 5001` | Modo worker do executável gerado: atende na porta 5001 os forks `on host(...)` vindos de outro computador |
 | `format(x, n)` / `clock()` / `int(x)` / `floor(x)` | `__format` / `__clock` / `__int` / `__mp_floor` |
 | `matrix(l, c, v)` | `__make_matrix(l, c, v)` |
 | `exp(x)` | `std::exp(x)` |
