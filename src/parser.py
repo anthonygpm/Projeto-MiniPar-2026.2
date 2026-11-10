@@ -214,7 +214,7 @@ class Parser:
             self._match(TokenType.SEMICOLON)
             return ContinueStmt(line=line)
         if self._match(TokenType.VAR): return self._parse_var_decl()
-        if self._peek().type == TokenType.TYPE:
+        if self._peek().type == TokenType.TYPE and not self._is_cast_call():
             type_tok = self._advance()
             return self._parse_var_decl(type_tok.lexeme)
         if self._match(TokenType.SEQ) or self._peek().type == TokenType.LBRACE: 
@@ -228,7 +228,7 @@ class Parser:
         if self._match(TokenType.DO): return self._parse_do_while_stmt()
         if self._match(TokenType.FOR): return self._parse_for_stmt()
 
-        if self._peek().type in (TokenType.IDENTIFIER, TokenType.THIS, TokenType.NEW, TokenType.RECEIVE, TokenType.INPUT, TokenType.C_CHANNEL, TokenType.MATRIX, TokenType.LBRACKET, TokenType.FORK, TokenType.JOIN):
+        if self._peek().type in (TokenType.IDENTIFIER, TokenType.THIS, TokenType.NEW, TokenType.RECEIVE, TokenType.INPUT, TokenType.C_CHANNEL, TokenType.MATRIX, TokenType.LBRACKET, TokenType.FORK, TokenType.JOIN) or self._is_cast_call():
             expr = self._parse_expression()
             if self._match(TokenType.ASSIGN):
                 return self._parse_assignment_tail(expr)
@@ -240,6 +240,18 @@ class Parser:
 
         tok = self._peek()
         sys.exit(print(f"[ERRO SINTATICO] Linha {tok.line}: Instrucao nao reconhecida: {tok.lexeme!r}", file=sys.stderr) or 1)
+
+    def _is_cast_call(self) -> bool:
+        """'int' seguido de '(' é a função nativa int(x), não uma declaração de variável."""
+        tok = self._peek()
+        nxt = self._tokens[self._pos + 1] if self._pos + 1 < len(self._tokens) else tok
+        return tok.type == TokenType.TYPE and tok.lexeme == "int" and nxt.type == TokenType.LPAREN
+
+    def _match_cast_call(self) -> bool:
+        if self._is_cast_call():
+            self._advance()
+            return True
+        return False
 
     def _parse_expression(self) -> ASTNode:
         # fork tem a menor precedência: "fork f(x) on core(1)" não se combina com operadores
@@ -392,7 +404,7 @@ class Parser:
             node = StringExpr(value=tok.lexeme, line=tok.line)
         elif self._match(TokenType.BOOL_LITERAL):
             node = BoolExpr(value=(tok.lexeme == "true"), line=tok.line)
-        elif self._match(TokenType.IDENTIFIER):
+        elif self._match(TokenType.IDENTIFIER) or self._match_cast_call():
             name = tok.lexeme
             if self._match(TokenType.LPAREN):
                 args = []
