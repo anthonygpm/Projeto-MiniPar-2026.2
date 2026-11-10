@@ -11,9 +11,11 @@ _CPP_HEADER = """\
 #include <cmath>
 #include <cstdlib>
 #include <type_traits>
+#include <future>
+#include <mutex>
 
 #ifdef _WIN32
-  #include <winsock2.h>
+  #include <winsock2.h>   // inclui <windows.h> (SetThreadAffinityMask)
   #include <ws2tcpip.h>
   #pragma comment(lib, "ws2_32.lib")
   #define CLOSE_SOCK closesocket
@@ -22,6 +24,11 @@ _CPP_HEADER = """\
   #include <arpa/inet.h>
   #include <unistd.h>
   #define CLOSE_SOCK close
+#endif
+
+#if defined(__linux__)
+  #include <pthread.h>
+  #include <sched.h>
 #endif
 
 // format(valor, casas): numero com casas decimais fixas, como f"{x:.4f}" no Python
@@ -147,6 +154,110 @@ auto __make_matrix(int rows, int cols, T init_val) {
     using ActualT = std::conditional_t<std::is_same_v<std::decay_t<T>, const char*>, std::string, T>;
     return std::vector<std::vector<ActualT>>(rows, std::vector<ActualT>(cols, init_val));
 }
+
+// ======================================================================
+// Fork / Join (MiniPar 2026.2)
+//
+//   var t = fork f(a, b) on core(n);   ->  auto t = __fork(n, [__a0 = a, __a1 = b]() { return f(__a0, __a1); });
+//   var r = join t;                    ->  auto r = __join(t);
+//
+// Cada fork cria uma std::thread propria. O resultado volta ao pai por um
+// std::promise / std::future: a thread filha cumpre a promessa ao terminar e
+// o join espera a thread e le o future. Os argumentos sao copiados no momento
+// do fork (a subtarefa nao compartilha as variaveis do pai).
+// ======================================================================
+
+// Fixa a thread atual no nucleo 'core' (numerados a partir de 1, como em core(1)).
+// Se o programa pedir mais nucleos do que a maquina tem, o numero da a volta
+// (core(9) numa CPU de 8 nucleos usa o nucleo 1). Devolve false se o SO recusar.
+bool __pin_to_core(long long core) {
+    unsigned total = std::thread::hardware_concurrency();
+    if (core < 1 || total == 0) return false;
+    unsigned idx = static_cast<unsigned>((core - 1) % total);
+#if defined(_WIN32)
+    if (idx >= sizeof(DWORD_PTR) * 8) return false;
+    return SetThreadAffinityMask(GetCurrentThread(), static_cast<DWORD_PTR>(1) << idx) != 0;
+#elif defined(__linux__)
+    cpu_set_t set;
+    CPU_ZERO(&set);
+    CPU_SET(idx, &set);
+    return pthread_setaffinity_np(pthread_self(), sizeof(set), &set) == 0;
+#else
+    return false;   // macOS e outros: sem API de afinidade; o SO escolhe o nucleo
+#endif
+}
+
+// Tarefa criada por fork: a thread e o future com o resultado
+template<typename R>
+class MiniParTask {
+public:
+    MiniParTask(std::thread t, std::shared_future<R> f) : thread_(std::move(t)), result_(std::move(f)) {}
+    MiniParTask(const MiniParTask&) = delete;
+    MiniParTask& operator=(const MiniParTask&) = delete;
+
+    // Como no multiprocessing do Python, o programa espera as tarefas que
+    // ninguem aguardou com join antes de terminar.
+    ~MiniParTask() { wait(); }
+
+    R join() {
+        wait();
+        return result_.get();
+    }
+
+private:
+    void wait() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (thread_.joinable()) thread_.join();
+    }
+    std::thread thread_;
+    std::shared_future<R> result_;
+    std::mutex mutex_;
+};
+
+// core <= 0: sem destino (o sistema operacional escolhe o nucleo)
+template<typename F>
+auto __fork(long long core, F subtarefa) {
+    using Ret = std::invoke_result_t<F&>;
+    // Subtarefa sem retorno (void) devolve 0 no join
+    using R = std::conditional_t<std::is_void_v<Ret>, long long, std::decay_t<Ret>>;
+    std::promise<R> promessa;
+    std::shared_future<R> futuro = promessa.get_future().share();
+    std::thread filha([core, subtarefa = std::move(subtarefa), promessa = std::move(promessa)]() mutable {
+        if (core > 0) __pin_to_core(core);
+        try {
+            if constexpr (std::is_void_v<Ret>) {
+                subtarefa();
+                promessa.set_value(0);
+            } else {
+                promessa.set_value(subtarefa());
+            }
+        } catch (...) {
+            promessa.set_exception(std::current_exception());
+        }
+    });
+    return std::make_shared<MiniParTask<R>>(std::move(filha), futuro);
+}
+
+template<typename R>
+R __join(const std::shared_ptr<MiniParTask<R>>& tarefa) { return tarefa->join(); }
+
+// "fork f();" sem guardar a tarefa: ela continua rodando e e aguardada no fim do programa
+std::vector<std::shared_ptr<void>>& __detached_tasks() {
+    static std::vector<std::shared_ptr<void>> tarefas;
+    return tarefas;
+}
+std::mutex __detached_mutex;
+template<typename T>
+void __keep_running(std::shared_ptr<T> tarefa) {
+    std::lock_guard<std::mutex> lock(__detached_mutex);
+    __detached_tasks().push_back(std::move(tarefa));
+}
+
+// Tipo dos elementos de uma lista criada vazia ([]) e preenchida com append:
+// numeros continuam double (como as listas literais); tarefas, textos e
+// listas mantem o proprio tipo.
+template<typename T>
+using __list_elem_t = std::conditional_t<std::is_arithmetic_v<std::decay_t<T>>, double, std::decay_t<T>>;
 
 class MiniParChannel {
 public:

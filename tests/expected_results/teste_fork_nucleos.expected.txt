@@ -1,0 +1,12 @@
+==== Fork/Join em nucleos ====
+join t1 + join t2 = 2498500
+metodo em core(3): 42
+fork dentro de metodo: 75
+subtarefa sem retorno: join ok
+sem destino (SO escolhe): 45
+Professor corrigiu 40 atividades
+Monitor 1 corrigiu 40 atividades
+Monitor 2 corrigiu 40 atividades
+Monitor 3 corrigiu 40 atividades
+argumento copiado no fork: 4950
+mesmo resultado sequencial e paralelo: 39999999734217728.0

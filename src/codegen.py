@@ -8,11 +8,16 @@ from ast_nodes import (
     UnaryExpr, NumberExpr, StringExpr, BoolExpr, IdentifierExpr, IfStmt, WhileStmt,
     DoWhileStmt, ForStmt, BreakStmt, ContinueStmt, InputExpr,
     ClassDecl, FuncDecl, ReturnStmt, MethodCall, FuncCallExpr, PropertyAccess, PropertyAssign, NewExpr, ThisExpr,
-    CChannelExpr, SendStmt, ReceiveExpr, ListLiteral, MatrixCreateExpr, IndexExpr, IndexAssign
+    CChannelExpr, SendStmt, ReceiveExpr, ListLiteral, MatrixCreateExpr, IndexExpr, IndexAssign,
+    ForkExpr, JoinExpr, CoreTarget, HostTarget
 )
 from cpp_template import _CPP_HEADER
 
 class CppCodeGenerator:
+    def __init__(self) -> None:
+        # Dentro de um método: as lambdas do fork precisam capturar 'this'
+        self._in_method = False
+
     @staticmethod
     def executable_suffix() -> str:
         """Extensão do executável gerado: '.exe' só no Windows."""
@@ -106,8 +111,16 @@ class CppCodeGenerator:
                 return f"input({self._translate_expression(node.prompt)})"
             return "input()"
 
+        if isinstance(node, ForkExpr):
+            return self._translate_fork(node)
+        if isinstance(node, JoinExpr):
+            return f"__join({self._translate_expression(node.task)})"
+
         if isinstance(node, ListLiteral):
             elems = ", ".join(self._translate_expression(e) for e in node.elements)
+            # ["Professor", "Monitor 1"] é lista de textos; as demais seguem numéricas
+            if node.elements and all(isinstance(e, StringExpr) for e in node.elements):
+                return f"std::vector<std::string>{{{elems}}}"
             return f"std::vector<double>{{{elems}}}"
         if isinstance(node, MatrixCreateExpr):
             r = self._translate_expression(node.rows)
@@ -121,6 +134,108 @@ class CppCodeGenerator:
             return f"__index({obj}, {idx})"
 
         return "0"
+
+    # ------------------------------------------------------------------
+    # Fork / Join
+    # ------------------------------------------------------------------
+    def _translate_fork(self, node: ForkExpr) -> str:
+        """fork f(a, b) on core(n)  ->  __fork(n, [__a0 = a, __a1 = b]() { return f(__a0, __a1); })
+
+        Os argumentos (e o objeto, num método) são avaliados no pai, no momento
+        do fork, e copiados para a subtarefa por init-capture: a thread filha
+        não enxerga mudanças posteriores nas variáveis do pai.
+        """
+        call = node.call
+        captures = [f"__a{i} = {self._translate_expression(arg)}" for i, arg in enumerate(call.arguments)]
+        args = ", ".join(f"__a{i}" for i in range(len(call.arguments)))
+        if isinstance(call, MethodCall):
+            captures.insert(0, f"__obj = {self._translate_expression(call.object)}")
+            body = f"__obj->{call.method_name}({args})"
+        else:
+            # Traduz como chamada comum (funções nativas viram seus helpers C++)
+            captured = [IdentifierExpr(f"__a{i}") for i in range(len(call.arguments))]
+            body = self._translate_expression(FuncCallExpr(call.name, captured))
+        if self._in_method:
+            captures.insert(0, "this")   # funções globais chamadas de dentro de um método
+
+        dest = node.destination
+        if isinstance(dest, CoreTarget):
+            core = self._translate_expression(dest.index)
+        elif isinstance(dest, HostTarget):
+            # Execução em outro computador ainda não gerada: roda localmente
+            print(f"[AVISO CODEGEN] Linha {node.line}: fork ... on host(...) ainda executa localmente "
+                  f"(o envio a outro computador nao foi implementado).")
+            core = "0LL"
+        else:
+            core = "0LL"   # sem destino: o sistema operacional escolhe o núcleo
+        return f"__fork({core}, [{', '.join(captures)}]() {{ return {body}; }})"
+
+    # ------------------------------------------------------------------
+    # Listas criadas vazias: var lista = []; ... lista.append(x);
+    # ------------------------------------------------------------------
+    def _empty_list_type(self, name: str, following: list) -> str:
+        """Tipo C++ de uma lista criada com [] a partir do primeiro append dela.
+
+        O g++ deduz o tipo com uma lambda em contexto não avaliado (C++20):
+        decltype([&]() { <declarações até o append>; return <valor>; }()).
+        Nada disso é executado; serve só para descobrir o tipo do elemento,
+        por exemplo a tarefa de um 'tarefas.append(fork f(k) on core(k + 1))'.
+        Sem append encontrado, a lista é de números (std::vector<double>).
+        """
+        found = self._find_append(name, following, [])
+        if found is None:
+            return "std::vector<double>"
+        replay, value = found
+        body = " ".join(replay + [f"return {self._translate_expression(value)};"])
+        return f"std::vector<__list_elem_t<decltype([&]() {{ {body} }}())>>"
+
+    def _find_append(self, name: str, stmts: list, replay: list[str]):
+        """Procura 'name.append(v)' em stmts, guardando as declarações do caminho até ele."""
+        replay = list(replay)
+        for stmt in stmts:
+            found = self._find_append_in(name, stmt, replay)
+            if found is not None:
+                return found
+            if isinstance(stmt, VarDecl):
+                if stmt.name == name:
+                    return None   # redeclarada: o append seguinte é de outra lista
+                init = self._translate_expression(stmt.init_value) if stmt.init_value else "0LL"
+                replay.append(f"auto {stmt.name} = {init};")
+        return None
+
+    def _find_append_in(self, name: str, stmt: Optional[ASTNode], replay: list[str]):
+        if stmt is None:
+            return None
+        if (isinstance(stmt, MethodCall) and stmt.method_name in ("append", "push_back")
+                and isinstance(stmt.object, IdentifierExpr) and stmt.object.name == name
+                and len(stmt.arguments) == 1):
+            return replay, stmt.arguments[0]
+        if isinstance(stmt, (SeqBlock, ParBlock)):
+            return self._find_append(name, stmt.statements, replay)
+        if isinstance(stmt, IfStmt):
+            return (self._find_append_in(name, stmt.then_branch, replay)
+                    or self._find_append_in(name, stmt.else_branch, replay))
+        if isinstance(stmt, (WhileStmt, DoWhileStmt)):
+            return self._find_append_in(name, stmt.body, replay)
+        if isinstance(stmt, ForStmt):
+            inner = list(replay)
+            if stmt.iterator_name:
+                inner.append(f"auto {stmt.iterator_name} = *std::begin({self._translate_expression(stmt.iterable)});")
+            elif isinstance(stmt.initializer, VarDecl):
+                init = self._translate_expression(stmt.initializer.init_value) if stmt.initializer.init_value else "0LL"
+                inner.append(f"auto {stmt.initializer.name} = {init};")
+            return self._find_append_in(name, stmt.body, inner)
+        return None
+
+    def _translate_block(self, stmts: list, indent: str) -> str:
+        """Traduz uma sequência de comandos; listas vazias olham os comandos seguintes."""
+        out = []
+        for i, stmt in enumerate(stmts):
+            if isinstance(stmt, VarDecl) and isinstance(stmt.init_value, ListLiteral) and not stmt.init_value.elements:
+                out.append(f"{indent}auto {stmt.name} = {self._empty_list_type(stmt.name, stmts[i + 1:])}{{}};\n")
+            else:
+                out.append(self._translate_statement(stmt, indent))
+        return "".join(out)
 
     def _has_value_return(self, node: Optional[ASTNode]) -> bool:
         if node is None: return False
@@ -175,8 +290,11 @@ class CppCodeGenerator:
             tgt = self._translate_expression(node.target)
             return f"{indent}{tgt} = {self._translate_expression(node.value)};\n"
         
-        if isinstance(node, (MethodCall, FuncCallExpr)):
+        if isinstance(node, (MethodCall, FuncCallExpr, JoinExpr)):
             return f"{indent}{self._translate_expression(node)};\n"
+        if isinstance(node, ForkExpr):
+            # "fork f();" sem guardar a tarefa: segue em paralelo e é aguardada no fim do programa
+            return f"{indent}__keep_running({self._translate_expression(node)});\n"
         if isinstance(node, ReturnStmt):
             val = self._translate_expression(node.value) if node.value else ""
             return f"{indent}return {val};\n"
@@ -199,10 +317,7 @@ class CppCodeGenerator:
             return f"{indent}std::cout{ ''.join(parts) } << std::endl;\n"
         
         if isinstance(node, SeqBlock):
-            lines = [f"{indent}{{\n"]
-            for stmt in node.statements: lines.append(self._translate_statement(stmt, indent + "    "))
-            lines.append(f"{indent}}}\n")
-            return "".join(lines)
+            return f"{indent}{{\n{self._translate_block(node.statements, indent + '    ')}{indent}}}\n"
         if isinstance(node, ParBlock):
             lines = [f"{indent}{{\n", f"{indent}    std::vector<std::thread> __m_thr;\n"]
             for stmt in node.statements:
@@ -241,6 +356,12 @@ class CppCodeGenerator:
             return res
         return ""
 
+    def _translate_body(self, body: ASTNode, indent: str) -> str:
+        """Corpo de função/método: os comandos do bloco, sem chaves extras."""
+        if isinstance(body, SeqBlock):
+            return self._translate_block(body.statements, indent)
+        return self._translate_statement(body, indent)
+
     def _translate_for_part(self, node: Optional[ASTNode]) -> str:
         if node is None: return ""
         if isinstance(node, VarDecl):
@@ -266,30 +387,31 @@ class CppCodeGenerator:
                         cpp_code += f"    decltype({init}) {attr.name} = {init};\n"
                     else:
                         cpp_code += f"    double {attr.name} = 0;\n"
+                self._in_method = True
                 for method in node.methods:
                     params = ", ".join(f"auto {p}" for p in method.params)
                     ret = self._return_type(method.body)
                     cpp_code += f"    {ret} {method.name}({params}) {{\n"
-                    if isinstance(method.body, SeqBlock):
-                        for stmt in method.body.statements: cpp_code += self._translate_statement(stmt, "        ")
-                    else: cpp_code += self._translate_statement(method.body, "        ")
+                    cpp_code += self._translate_body(method.body, "        ")
                     cpp_code += "    }\n"
+                self._in_method = False
                 cpp_code += "};\n\n"
             elif isinstance(node, FuncDecl):
                 params = ", ".join(f"auto {p}" for p in node.params)
                 ret = self._return_type(node.body)
                 cpp_code += f"{ret} {node.name}({params}) {{\n"
-                if isinstance(node.body, SeqBlock):
-                    for stmt in node.body.statements: cpp_code += self._translate_statement(stmt, "    ")
-                else: cpp_code += self._translate_statement(node.body, "    ")
+                cpp_code += self._translate_body(node.body, "    ")
                 cpp_code += "}\n\n"
 
         cpp_code += "int main() {\n    #ifdef _WIN32\n        WSADATA wsa;\n        WSAStartup(MAKEWORD(2,2), &wsa);\n    #endif\n\n"
+        # Comandos globais viram o corpo do main (um seq { } global é aberto no mesmo nível)
+        main_stmts = []
         for node in program.statements:
-            if not isinstance(node, (ClassDecl, FuncDecl)):
-                if isinstance(node, SeqBlock):
-                    for stmt in node.statements: cpp_code += self._translate_statement(stmt, "    ")
-                else: cpp_code += self._translate_statement(node, "    ")
+            if isinstance(node, SeqBlock):
+                main_stmts.extend(node.statements)
+            elif not isinstance(node, (ClassDecl, FuncDecl)):
+                main_stmts.append(node)
+        cpp_code += self._translate_block(main_stmts, "    ")
         cpp_code += "\n    return 0;\n}\n"
 
         os.makedirs("output", exist_ok=True)
@@ -297,7 +419,7 @@ class CppCodeGenerator:
         exe_path = os.path.join("output", output_name + self.executable_suffix())
 
         with open(cpp_path, "w", encoding="utf-8") as f: f.write(cpp_code)
-        
+
         print("[CODEGEN] Compilando via g++ com -std=c++20 e -O3...")
         result = subprocess.run(self.gcc_command(cpp_path, exe_path))
         if result.returncode == 0:

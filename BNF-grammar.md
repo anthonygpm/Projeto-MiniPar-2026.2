@@ -790,7 +790,6 @@ e o gerador LCG dos testes 8–10 (`estado * 1103515245 + 12345`) não estouram 
 > Atenção: `/` entre dois inteiros faz divisão inteira no C++ gerado (`7 / 2` vale `3`).
 > Para divisão real, use um operando com ponto: `7 / 2.0`.
 
-
 **Exemplos:** `0`, `42`, `3.14`, `0.5`
 
 ### 14.2 String
@@ -844,7 +843,6 @@ As seguintes funções são reconhecidas pelo analisador semântico e traduzidas
 Indexação de string (2026.2): `s[i]` devolve um texto de 1 caractere, como no Python.
 Índices negativos contam do fim (`s[-1]`). Em listas, matrizes e strings, um índice fora
 dos limites encerra o programa com `[ERRO DE EXECUCAO] Indice i fora dos limites`.
-
 
 ### Métodos de Lista (acesso via ponto)
 
@@ -1151,7 +1149,13 @@ O analisador semântico (`src/semantic.py`) usa inferência simples de tipos com
 | `send(canal, msg)` | `canal->sendData(__to_string(msg))` |
 | `receive(canal)` | `canal->receiveData()` |
 | `[1, 2, 3]` | `std::vector<double>{1LL, 2LL, 3LL}` |
+| `["a", "b"]` | `std::vector<std::string>{...}` |
+| `var l = []; ... l.append(v);` | `std::vector<T>` com `T` deduzido do primeiro `append` (números: `double`) |
 | `lista[i]` | `__index(lista, i)` (confere os limites) |
+| `fork f(a) on core(n)` | `__fork(n, [__a0 = a]() { return f(__a0); })`: `std::thread` + `std::promise`/`std::future`, fixada no núcleo `n` (`SetThreadAffinityMask` no Windows, `pthread_setaffinity_np` no Linux) |
+| `fork f(a)` | `__fork(0, ...)`: o sistema operacional escolhe o núcleo |
+| `join t` | `__join(t)`: espera a thread e devolve o valor do `future` |
+| `format(x, n)` / `clock()` / `int(x)` / `floor(x)` | `__format` / `__clock` / `__int` / `__floor` |
 | `matrix(l, c, v)` | `__make_matrix(l, c, v)` |
 | `exp(x)` | `std::exp(x)` |
 | `random()` | `random_val()` |
@@ -1159,7 +1163,6 @@ O analisador semântico (`src/semantic.py`) usa inferência simples de tipos com
 | `len(x)` | `x.size()` |
 | `range(n)` | `__minipar_range(n)` |
 | `input(p)` | `input(p)` (helper C++) |
-| `format(x, n)` / `clock()` / `int(x)` / `floor(x)` | `__format` / `__clock` / `__int` / `__floor` |
 
 ---
 

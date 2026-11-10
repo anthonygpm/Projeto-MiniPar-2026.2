@@ -1,0 +1,116 @@
+# Fork e Join em nucleos da CPU: threads com afinidade, resultado coletado no join
+
+# Trabalho pesado de CPU: soma 0 + 1 + ... + (n - 1)
+func somar_ate(n) {
+    var soma = 0;
+    var i = 0;
+    while (i < n) {
+        soma = soma + i;
+        i = i + 1;
+    }
+    return soma;
+}
+
+# Carga de CPU real: soma em ponto flutuante (o g++ -O3 transforma a soma de
+# inteiros em formula fechada, mas nao pode reordenar somas de double)
+func carga_cpu(n) {
+    var soma = 0.0;
+    var i = 0;
+    while (i < n) {
+        soma = soma + (i * 0.5);
+        i = i + 1;
+    }
+    return soma;
+}
+
+func rotulo(avaliador, quantidade) {
+    return avaliador + " corrigiu " + quantidade + " atividades";
+}
+
+func sem_retorno(x) {
+    var y = x * 2;
+}
+
+class Avaliador {
+    var nome = "Professor";
+    var fator = 3;
+
+    func multiplicar(x) {
+        return x * this.fator;
+    }
+
+    # fork dentro de um metodo: a subtarefa usa uma funcao global e o proprio objeto
+    func dividir_trabalho(n) {
+        var a = fork somar_ate(n) on core(1);
+        var b = fork this.multiplicar(n) on core(2);
+        return join a + join b;
+    }
+}
+
+# Lista de tarefas criada vazia dentro de uma funcao; resultado do tipo texto
+func avaliar_em_paralelo(nucleos) {
+    var nomes = ["Professor", "Monitor 1", "Monitor 2", "Monitor 3"];
+    var tarefas = [];
+    var k = 0;
+    while (k < nucleos) {
+        tarefas.append(fork rotulo(nomes[k], "40") on core(k + 1));
+        k = k + 1;
+    }
+    var resultados = [];
+    for (var t in tarefas) {
+        resultados.append(join t);
+    }
+    return resultados;
+}
+
+seq {
+    print("==== Fork/Join em nucleos ====");
+
+    var t1 = fork somar_ate(1000) on core(1);
+    var t2 = fork somar_ate(2000) on core(2);
+    print("join t1 + join t2 =", join t1 + join t2);
+
+    var prof = new Avaliador();
+    var tm = fork prof.multiplicar(14) on core(3);
+    print("metodo em core(3):", join tm);
+    print("fork dentro de metodo:", prof.dividir_trabalho(10));
+
+    var tv = fork sem_retorno(5) on core(4);
+    join tv;
+    print("subtarefa sem retorno: join ok");
+
+    var ts = fork somar_ate(10);
+    print("sem destino (SO escolhe):", join ts);
+
+    for (var linha in avaliar_em_paralelo(4)) {
+        print(linha);
+    }
+
+    # Argumentos sao copiados no momento do fork
+    var n = 100;
+    var tc = fork somar_ate(n) on core(1);
+    n = 0;
+    print("argumento copiado no fork:", join tc);
+
+    # fork descartado: segue em paralelo e o programa espera por ele no fim
+    fork somar_ate(5);
+
+    # Ganho de desempenho: 4 nucleos x sequencial (so informativo)
+    var carga = 200000000;
+    var inicio = clock();
+    var s = carga_cpu(carga) + carga_cpu(carga) + carga_cpu(carga) + carga_cpu(carga);
+    var tempo_seq = clock() - inicio;
+
+    inicio = clock();
+    var p1 = fork carga_cpu(carga) on core(1);
+    var p2 = fork carga_cpu(carga) on core(2);
+    var p3 = fork carga_cpu(carga) on core(3);
+    var p4 = fork carga_cpu(carga) on core(4);
+    var p = join p1 + join p2 + join p3 + join p4;
+    var tempo_par = clock() - inicio;
+
+    if (s == p) {
+        print("mesmo resultado sequencial e paralelo:", format(p, 1));
+    }
+    print("Tempo sequencial:", format(tempo_seq, 2), "s | paralelo:", format(tempo_par, 2), "s | speedup:", format(tempo_seq / tempo_par, 2), "x");
+}
