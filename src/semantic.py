@@ -120,7 +120,8 @@ class SemanticAnalyzer:
         return "unknown"
 
     def _types_compatible(self, declared: str, actual: str) -> bool:
-        if declared in ("var", "unknown") or actual == "unknown": return True
+        # "var" = tipo não descoberto na análise (ex.: var n = len(s)): aceita qualquer valor
+        if declared in ("var", "unknown") or actual in ("var", "unknown"): return True
         # null vale como referência a qualquer objeto, e uma variável iniciada com null
         # pode depois receber um objeto (nunca um número, texto ou bool)
         if actual == "null": return declared not in ("number", "int", "string", "bool")

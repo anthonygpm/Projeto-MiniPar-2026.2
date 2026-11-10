@@ -180,6 +180,18 @@ std::string __to_string(const T& val) {
     }
 }
 
+// a + b: soma normal; se um lado for texto e o outro numero, concatena
+// ("t" + 3 vale "t3", "#" + 2.5 vale "#2.5"), como o Java faz com String.
+template<typename A, typename B>
+auto __mp_add(const A& a, const B& b) {
+    constexpr bool ta = std::is_constructible_v<std::string, A>;
+    constexpr bool tb = std::is_constructible_v<std::string, B>;
+    if constexpr (ta && !tb) return std::string(a) + __to_string(b);
+    else if constexpr (!ta && tb) return __to_string(a) + std::string(b);
+    else if constexpr (ta && tb) return std::string(a) + std::string(b);
+    else return a + b;
+}
+
 // write_file(caminho, texto): grava o texto no arquivo (cria ou substitui).
 // Devolve true se gravou; em caso de falha avisa e devolve false.
 template<typename T>
