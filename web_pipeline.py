@@ -90,9 +90,25 @@ def token_category(t: TokenType) -> str:
     return "operador"
 
 
+class _LexerComPosicao(Lexer):
+    """Lexer que também anota onde cada token TERMINA (end_line, end_col).
+
+    O _make_token é chamado logo depois de o token ser consumido, então a
+    posição atual do lexer é o fim dele. Isso permite à Web 2 destacar o
+    trecho exato no editor, inclusive strings com aspas e escapes.
+    """
+    def _make_token(self, token_type, lexeme, line, col):
+        tok = super()._make_token(token_type, lexeme, line, col)
+        tok.end_line, tok.end_col = self._line, self._col
+        return tok
+
+
 def token_to_dict(t: Token) -> dict[str, Any]:
+    end_line = getattr(t, "end_line", t.line)
+    end_col = getattr(t, "end_col", t.col + len(t.lexeme))
     return {"type": t.type.name, "category": token_category(t.type),
-            "lexeme": t.lexeme, "line": t.line, "col": t.col}
+            "lexeme": t.lexeme, "line": t.line, "col": t.col,
+            "end_line": end_line, "end_col": end_col}
 
 
 def _symbols(sem: SemanticAnalyzer) -> dict[str, Any]:
@@ -111,6 +127,142 @@ def _symbols(sem: SemanticAnalyzer) -> dict[str, Any]:
     }
 
 
+# ----------------------------------------------------------------------
+# l7 — tabela de símbolos por escopo e problemas (erros/avisos) por linha
+# ----------------------------------------------------------------------
+import re  # noqa: E402
+
+from ast_nodes import ClassDecl, ForStmt, FuncDecl, ParBlock, SeqBlock  # noqa: E402
+
+
+class _AnalisadorComEscopos(SemanticAnalyzer):
+    """SemanticAnalyzer que guarda uma cópia de cada escopo antes de descartá-lo.
+
+    O analisador original empilha um dicionário por escopo e o descarta ao
+    sair dele; aqui sobrescrevemos _enter_scope/_exit_scope só para registrar
+    o conteúdo, sem mudar nenhuma regra semântica. O nó que está sendo
+    validado no momento diz que tipo de escopo foi aberto (função, classe,
+    for, bloco).
+    """
+
+    def __init__(self) -> None:
+        self._pilha_nos: list = []
+        self._pilha_escopos: list[int] = []
+        self._linhas: dict = {}          # (id do escopo, nome) -> linha da declaração
+        self.escopos: list[dict[str, Any]] = []
+        super().__init__()               # já abre o escopo global
+
+    def validate_node(self, node) -> None:
+        self._pilha_nos.append(node)
+        try:
+            super().validate_node(node)
+        finally:
+            self._pilha_nos.pop()
+
+    def _define_symbol(self, name, type_, line, params=None) -> None:
+        super()._define_symbol(name, type_, line, params)
+        self._linhas.setdefault((id(self._scopes[-1]), name), line)
+
+    def _enter_scope(self) -> None:
+        super()._enter_scope()
+        node = self._pilha_nos[-1] if self._pilha_nos else None
+        pai = self._pilha_escopos[-1] if self._pilha_escopos else None
+        tipo, nome = "global", "Escopo global"
+        if isinstance(node, FuncDecl):
+            if self._current_class:
+                tipo, nome = "metodo", f"método {self._current_class}.{node.name}({', '.join(node.params)})"
+            else:
+                tipo, nome = "funcao", f"função {node.name}({', '.join(node.params)})"
+        elif isinstance(node, ClassDecl):
+            tipo, nome = "classe", f"classe {node.name}" + (f" extends {node.superclass}" if node.superclass else "")
+        elif isinstance(node, ForStmt):
+            tipo, nome = "for", "laço for"
+        elif isinstance(node, ParBlock):
+            tipo, nome = "par", "bloco par"
+        elif isinstance(node, SeqBlock):
+            pai_reg = self.escopos[pai] if pai is not None else None
+            if pai_reg and pai_reg["tipo"] in ("funcao", "metodo") and not pai_reg["filhos"]:
+                tipo, nome = "corpo", "corpo"
+            else:
+                tipo, nome = "bloco", "bloco { }"
+        linha = getattr(node, "line", None) if node is not None else None
+        if isinstance(node, (SeqBlock, ParBlock)):
+            # o parser não anota a linha dos blocos: usa o 1º comando ou o dono do bloco
+            if node.statements:
+                linha = getattr(node.statements[0], "line", linha)
+            elif pai is not None:
+                linha = self.escopos[pai]["linha"]
+        reg = {"id": len(self.escopos), "pai": pai, "tipo": tipo, "nome": nome,
+               "linha": linha,
+               "simbolos": [], "filhos": [], "_dict": self._scopes[-1]}
+        self.escopos.append(reg)
+        if pai is not None:
+            self.escopos[pai]["filhos"].append(reg["id"])
+        self._pilha_escopos.append(reg["id"])
+
+    def _exit_scope(self) -> None:
+        if len(self._scopes) > 1 and self._pilha_escopos:
+            self._fotografar(self._pilha_escopos.pop())
+        super()._exit_scope()
+
+    def _fotografar(self, idx: int) -> None:
+        reg = self.escopos[idx]
+        escopo = reg["_dict"]
+        simbolos = []
+        for nome, sym in escopo.items():
+            item = {"nome": nome, "tipo": sym.type, "linha": self._linhas.get((id(escopo), nome))}
+            if sym.type == "FUNC":
+                item["tipo"] = "método" if reg["tipo"] == "classe" else "função"
+                item["detalhe"] = "(" + ", ".join(sym.params) + ")"
+            elif sym.type == "CLASS":
+                item["tipo"] = "classe"
+                c = self._classes.get(nome)
+                if c:
+                    item["detalhe"] = (f"atributos: {', '.join(c.attributes) or '—'} · "
+                                       f"métodos: {', '.join(c.methods) or '—'}")
+            simbolos.append(item)
+        reg["simbolos"] = simbolos
+
+    def resultado_escopos(self) -> list[dict[str, Any]]:
+        # o escopo global nunca é desempilhado: fotografa no fim
+        if self.escopos:
+            self._fotografar(0)
+        return [{k: v for k, v in r.items() if k != "_dict"} for r in self.escopos]
+
+
+_RE_PROBLEMA = re.compile(
+    r"^\[(ERRO|AVISO)(?: ([A-ZÁÉÍÓÚÇ]+))?\]\s*(?:Linha (\d+)(?:, coluna (\d+))?)?(?: \(Funcao: ([^)]+)\))?:?\s*(.*)$")
+_FASE_DO_ROTULO = {"LEXICO": "léxica", "SINTATICO": "sintática", "SEMANTICO": "semântica",
+                   "INTERNO": "interno", None: "compilação"}
+
+
+def extrair_problemas(*textos: str) -> list[dict[str, Any]]:
+    """Lê as mensagens [ERRO ...]/[AVISO ...] que as fases imprimem.
+
+    Usa o texto impresso (e não só sem.diagnostics) porque algumas mensagens,
+    como erro léxico, sintático e variável redeclarada, só existem ali.
+    """
+    vistos, out = set(), []
+    for texto in textos:
+        for linha in (texto or "").splitlines():
+            m = _RE_PROBLEMA.match(linha.strip())
+            if not m:
+                continue
+            nivel, rotulo, ln, col, funcao, msg = m.groups()
+            if not msg or "Falha na Analise Semantica" in msg:
+                continue
+            chave = (nivel, ln, msg)
+            if chave in vistos:
+                continue
+            vistos.add(chave)
+            out.append({"kind": "erro" if nivel == "ERRO" else "aviso",
+                        "fase": _FASE_DO_ROTULO.get(rotulo, (rotulo or "").lower()),
+                        "line": int(ln) if ln else None, "col": int(col) if col else None,
+                        "funcao": funcao, "message": msg})
+    out.sort(key=lambda p: (p["line"] is None, p["line"] or 0, p["kind"] != "erro"))
+    return out
+
+
 def run_phases(code: str, ate: str = "semantic") -> dict[str, Any]:
     """Roda as fases do compilador até `ate` (inclusive) e devolve um dict JSON.
 
@@ -126,7 +278,7 @@ def run_phases(code: str, ate: str = "semantic") -> dict[str, Any]:
     fase = "tokens"
     with _LOCK, contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
         try:
-            tokens = Lexer(code).tokenize()
+            tokens = _LexerComPosicao(code).tokenize()
             res["tokens"] = [token_to_dict(t) for t in tokens]
             desconhecidos = [t for t in tokens if t.type is TokenType.UNKNOWN]
             for t in desconhecidos:
@@ -144,10 +296,11 @@ def run_phases(code: str, ate: str = "semantic") -> dict[str, Any]:
                 return res
 
             fase = "semantic"
-            sem = SemanticAnalyzer()
+            sem = _AnalisadorComEscopos()
             res["ok"] = sem.analyze(program)
             res["diagnostics"] = sem.diagnostics
             res["symbols"] = _symbols(sem)
+            res["escopos"] = sem.resultado_escopos()
             if alvo == 2 or not res["ok"]:
                 return res
 
@@ -167,6 +320,7 @@ def run_phases(code: str, ate: str = "semantic") -> dict[str, Any]:
             if not res["ok"]:
                 res["fase_parada"] = fase
             res["log"], res["errors"] = out.getvalue(), err.getvalue()
+            res["problemas"] = extrair_problemas(res["errors"], res["log"])
     return res
 
 
@@ -190,7 +344,11 @@ def _gerar_cpp(program) -> dict[str, Any]:
         if os.path.isfile(p):
             with contextlib.suppress(OSError):
                 os.remove(p)
-    return {"cpp": cpp, "cpp_compilou": bool(compilou)}
+    # O C++ começa com o runtime fixo (cpp_template._CPP_HEADER); a Web 2 mostra
+    # por padrão só o que foi traduzido do programa, a partir desta linha.
+    from cpp_template import _CPP_HEADER
+    inicio = len(_CPP_HEADER.splitlines()) + 1 if cpp.startswith(_CPP_HEADER) else 1
+    return {"cpp": cpp, "cpp_compilou": bool(compilou), "cpp_inicio_programa": inicio}
 
 
 # ----------------------------------------------------------------------

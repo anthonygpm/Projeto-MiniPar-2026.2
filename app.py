@@ -81,6 +81,13 @@ def api_run():
         stdin = "\n".join(str(x) for x in stdin)
     return jsonify(run_executable(data.get('code', ''), stdin))
 
+@app.route('/api/exemplos', methods=['GET'])
+def api_exemplos():
+    """Web 2: lista os .minipar de tests/ e das subpastas (fork_join/, dois_computadores/...)."""
+    achados = glob.glob(os.path.join(TESTS_DIR, '**', '*.minipar'), recursive=True)
+    nomes = sorted(os.path.relpath(f, TESTS_DIR).replace(os.sep, '/') for f in achados)
+    return jsonify({"tests": nomes})
+
 @app.route('/api/tests', methods=['GET'])
 def get_tests():
     # Retorna os testes ordenados alfabeticamente
