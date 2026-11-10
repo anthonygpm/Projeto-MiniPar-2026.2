@@ -1,0 +1,181 @@
+[Professor] Concluiu: Aluno 1 - Atividade 1
+[Professor] Concluiu: Aluno 1 - Atividade 2
+[Professor] Concluiu: Aluno 1 - Atividade 3
+[Professor] Concluiu: Aluno 1 - Atividade 4
+[Professor] Concluiu: Aluno 2 - Atividade 1
+[Professor] Concluiu: Aluno 2 - Atividade 2
+[Professor] Concluiu: Aluno 2 - Atividade 3
+[Professor] Concluiu: Aluno 2 - Atividade 4
+[Professor] Concluiu: Aluno 3 - Atividade 1
+[Professor] Concluiu: Aluno 3 - Atividade 2
+[Professor] Concluiu: Aluno 3 - Atividade 3
+[Professor] Concluiu: Aluno 3 - Atividade 4
+[Professor] Concluiu: Aluno 4 - Atividade 1
+[Professor] Concluiu: Aluno 4 - Atividade 2
+[Professor] Concluiu: Aluno 4 - Atividade 3
+[Professor] Concluiu: Aluno 4 - Atividade 4
+[Professor] Concluiu: Aluno 5 - Atividade 1
+[Professor] Concluiu: Aluno 5 - Atividade 2
+[Professor] Concluiu: Aluno 5 - Atividade 3
+[Professor] Concluiu: Aluno 5 - Atividade 4
+[Professor] Concluiu: Aluno 6 - Atividade 1
+[Professor] Concluiu: Aluno 6 - Atividade 2
+[Professor] Concluiu: Aluno 6 - Atividade 3
+[Professor] Concluiu: Aluno 6 - Atividade 4
+[Professor] Concluiu: Aluno 7 - Atividade 1
+[Professor] Concluiu: Aluno 7 - Atividade 2
+[Professor] Concluiu: Aluno 7 - Atividade 3
+[Professor] Concluiu: Aluno 7 - Atividade 4
+[Professor] Concluiu: Aluno 8 - Atividade 1
+[Professor] Concluiu: Aluno 8 - Atividade 2
+[Professor] Concluiu: Aluno 8 - Atividade 3
+[Professor] Concluiu: Aluno 8 - Atividade 4
+[Professor] Concluiu: Aluno 9 - Atividade 1
+[Professor] Concluiu: Aluno 9 - Atividade 2
+[Professor] Concluiu: Aluno 9 - Atividade 3
+[Professor] Concluiu: Aluno 9 - Atividade 4
+[Professor] Concluiu: Aluno 10 - Atividade 1
+[Professor] Concluiu: Aluno 10 - Atividade 2
+[Professor] Concluiu: Aluno 10 - Atividade 3
+[Professor] Concluiu: Aluno 10 - Atividade 4
+[Professor] Concluiu: Aluno 11 - Atividade 1
+[Professor] Concluiu: Aluno 11 - Atividade 2
+[Professor] Concluiu: Aluno 11 - Atividade 3
+[Professor] Concluiu: Aluno 11 - Atividade 4
+[Professor] Concluiu: Aluno 12 - Atividade 1
+[Professor] Concluiu: Aluno 12 - Atividade 2
+[Professor] Concluiu: Aluno 12 - Atividade 3
+[Professor] Concluiu: Aluno 12 - Atividade 4
+[Professor] Concluiu: Aluno 13 - Atividade 1
+[Professor] Concluiu: Aluno 13 - Atividade 2
+[Professor] Concluiu: Aluno 13 - Atividade 3
+[Professor] Concluiu: Aluno 13 - Atividade 4
+[Professor] Concluiu: Aluno 14 - Atividade 1
+[Professor] Concluiu: Aluno 14 - Atividade 2
+[Professor] Concluiu: Aluno 14 - Atividade 3
+[Professor] Concluiu: Aluno 14 - Atividade 4
+[Professor] Concluiu: Aluno 15 - Atividade 1
+[Professor] Concluiu: Aluno 15 - Atividade 2
+[Professor] Concluiu: Aluno 15 - Atividade 3
+[Professor] Concluiu: Aluno 15 - Atividade 4
+[Professor] Concluiu: Aluno 16 - Atividade 1
+[Professor] Concluiu: Aluno 16 - Atividade 2
+[Professor] Concluiu: Aluno 16 - Atividade 3
+[Professor] Concluiu: Aluno 16 - Atividade 4
+[Professor] Concluiu: Aluno 17 - Atividade 1
+[Professor] Concluiu: Aluno 17 - Atividade 2
+[Professor] Concluiu: Aluno 17 - Atividade 3
+[Professor] Concluiu: Aluno 17 - Atividade 4
+[Professor] Concluiu: Aluno 18 - Atividade 1
+[Professor] Concluiu: Aluno 18 - Atividade 2
+[Professor] Concluiu: Aluno 18 - Atividade 3
+[Professor] Concluiu: Aluno 18 - Atividade 4
+[Professor] Concluiu: Aluno 19 - Atividade 1
+[Professor] Concluiu: Aluno 19 - Atividade 2
+[Professor] Concluiu: Aluno 19 - Atividade 3
+[Professor] Concluiu: Aluno 19 - Atividade 4
+[Professor] Concluiu: Aluno 20 - Atividade 1
+[Professor] Concluiu: Aluno 20 - Atividade 2
+[Professor] Concluiu: Aluno 20 - Atividade 3
+[Professor] Concluiu: Aluno 20 - Atividade 4
+[Professor] Concluiu: Aluno 21 - Atividade 1
+[Professor] Concluiu: Aluno 21 - Atividade 2
+[Professor] Concluiu: Aluno 21 - Atividade 3
+[Professor] Concluiu: Aluno 21 - Atividade 4
+[Professor] Concluiu: Aluno 22 - Atividade 1
+[Professor] Concluiu: Aluno 22 - Atividade 2
+[Professor] Concluiu: Aluno 22 - Atividade 3
+[Professor] Concluiu: Aluno 22 - Atividade 4
+[Professor] Concluiu: Aluno 23 - Atividade 1
+[Professor] Concluiu: Aluno 23 - Atividade 2
+[Professor] Concluiu: Aluno 23 - Atividade 3
+[Professor] Concluiu: Aluno 23 - Atividade 4
+[Professor] Concluiu: Aluno 24 - Atividade 1
+[Professor] Concluiu: Aluno 24 - Atividade 2
+[Professor] Concluiu: Aluno 24 - Atividade 3
+[Professor] Concluiu: Aluno 24 - Atividade 4
+[Professor] Concluiu: Aluno 25 - Atividade 1
+[Professor] Concluiu: Aluno 25 - Atividade 2
+[Professor] Concluiu: Aluno 25 - Atividade 3
+[Professor] Concluiu: Aluno 25 - Atividade 4
+[Professor] Concluiu: Aluno 26 - Atividade 1
+[Professor] Concluiu: Aluno 26 - Atividade 2
+[Professor] Concluiu: Aluno 26 - Atividade 3
+[Professor] Concluiu: Aluno 26 - Atividade 4
+[Professor] Concluiu: Aluno 27 - Atividade 1
+[Professor] Concluiu: Aluno 27 - Atividade 2
+[Professor] Concluiu: Aluno 27 - Atividade 3
+[Professor] Concluiu: Aluno 27 - Atividade 4
+[Professor] Concluiu: Aluno 28 - Atividade 1
+[Professor] Concluiu: Aluno 28 - Atividade 2
+[Professor] Concluiu: Aluno 28 - Atividade 3
+[Professor] Concluiu: Aluno 28 - Atividade 4
+[Professor] Concluiu: Aluno 29 - Atividade 1
+[Professor] Concluiu: Aluno 29 - Atividade 2
+[Professor] Concluiu: Aluno 29 - Atividade 3
+[Professor] Concluiu: Aluno 29 - Atividade 4
+[Professor] Concluiu: Aluno 30 - Atividade 1
+[Professor] Concluiu: Aluno 30 - Atividade 2
+[Professor] Concluiu: Aluno 30 - Atividade 3
+[Professor] Concluiu: Aluno 30 - Atividade 4
+[Professor] Concluiu: Aluno 31 - Atividade 1
+[Professor] Concluiu: Aluno 31 - Atividade 2
+[Professor] Concluiu: Aluno 31 - Atividade 3
+[Professor] Concluiu: Aluno 31 - Atividade 4
+[Professor] Concluiu: Aluno 32 - Atividade 1
+[Professor] Concluiu: Aluno 32 - Atividade 2
+[Professor] Concluiu: Aluno 32 - Atividade 3
+[Professor] Concluiu: Aluno 32 - Atividade 4
+[Professor] Concluiu: Aluno 33 - Atividade 1
+[Professor] Concluiu: Aluno 33 - Atividade 2
+[Professor] Concluiu: Aluno 33 - Atividade 3
+[Professor] Concluiu: Aluno 33 - Atividade 4
+[Professor] Concluiu: Aluno 34 - Atividade 1
+[Professor] Concluiu: Aluno 34 - Atividade 2
+[Professor] Concluiu: Aluno 34 - Atividade 3
+[Professor] Concluiu: Aluno 34 - Atividade 4
+[Professor] Concluiu: Aluno 35 - Atividade 1
+[Professor] Concluiu: Aluno 35 - Atividade 2
+[Professor] Concluiu: Aluno 35 - Atividade 3
+[Professor] Concluiu: Aluno 35 - Atividade 4
+[Professor] Concluiu: Aluno 36 - Atividade 1
+[Professor] Concluiu: Aluno 36 - Atividade 2
+[Professor] Concluiu: Aluno 36 - Atividade 3
+[Professor] Concluiu: Aluno 36 - Atividade 4
+[Professor] Concluiu: Aluno 37 - Atividade 1
+[Professor] Concluiu: Aluno 37 - Atividade 2
+[Professor] Concluiu: Aluno 37 - Atividade 3
+[Professor] Concluiu: Aluno 37 - Atividade 4
+[Professor] Concluiu: Aluno 38 - Atividade 1
+[Professor] Concluiu: Aluno 38 - Atividade 2
+[Professor] Concluiu: Aluno 38 - Atividade 3
+[Professor] Concluiu: Aluno 38 - Atividade 4
+[Professor] Concluiu: Aluno 39 - Atividade 1
+[Professor] Concluiu: Aluno 39 - Atividade 2
+[Professor] Concluiu: Aluno 39 - Atividade 3
+[Professor] Concluiu: Aluno 39 - Atividade 4
+[Professor] Concluiu: Aluno 40 - Atividade 1
+[Professor] Concluiu: Aluno 40 - Atividade 2
+[Professor] Concluiu: Aluno 40 - Atividade 3
+[Professor] Concluiu: Aluno 40 - Atividade 4
+Total de atividades: 160
+[ ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ]
+[ ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ]
+[ ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  , .,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ]
+[ ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  , ., ., =, :, .,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ]
+[ ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  , @, @, @, :,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ]
+[ ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  , +, @, ., @, @, @, @, @, @, @, @, @, .,  , :, ., .,  ,  ,  ,  ,  ,  ,  ,  ,  ]
+[ ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  , ., @, @, @, @, @, @, @, @, @, @, @, @, @, @, :,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ]
+[ ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  , .,  ,  ,  ,  ,  , #, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, :,  ,  ,  ,  ,  ,  ,  ,  ,  ]
+[ ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  , ., @, :, @, @, @, -,  , :, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, :,  ,  ,  ,  ,  ,  ,  ,  ,  ]
+[ ,  ,  ,  ,  ,  ,  ,  ,  ,  , -,  , ., @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ]
+[@, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, .,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ]
+[ ,  ,  ,  ,  ,  ,  ,  ,  ,  , -,  , ., @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ]
+[ ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  , ., @, :, @, @, @, -,  , :, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, :,  ,  ,  ,  ,  ,  ,  ,  ,  ]
+[ ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  , .,  ,  ,  ,  ,  , #, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, @, :,  ,  ,  ,  ,  ,  ,  ,  ,  ]
+[ ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  , ., @, @, @, @, @, @, @, @, @, @, @, @, @, @, :,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ]
+[ ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  , +, @, ., @, @, @, @, @, @, @, @, @, .,  , :, ., .,  ,  ,  ,  ,  ,  ,  ,  ,  ]
+[ ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  , @, @, @, :,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ]
+[ ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  , ., ., =, :, .,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ]
+[ ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  , .,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ]
+[ ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ,  ]

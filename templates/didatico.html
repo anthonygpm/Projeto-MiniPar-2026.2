@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MiniPar Didático</title>
+    <link rel="stylesheet" href="/static/css/didatico.css">
+</head>
+<body>
+    <header class="topo">
+        <h1>MiniPar <span>· Web 2 (didática)</span></h1>
+        <nav>
+            <select id="test-select" aria-label="Carregar programa de teste">
+                <option value="">Carregar teste…</option>
+            </select>
+            <a href="/" class="link">Ir para a Web 1</a>
+        </nav>
+    </header>
+
+    <main class="area">
+        <section class="painel">
+            <div class="painel-titulo">Código-fonte (MiniPar)</div>
+            <textarea id="code" spellcheck="false" placeholder="Escreva ou carregue um programa MiniPar…"></textarea>
+            <div class="painel-titulo">Entrada (stdin) para input()</div>
+            <textarea id="stdin" class="stdin" spellcheck="false" placeholder="Uma resposta por linha"></textarea>
+        </section>
+
+        <section class="painel">
+            <div class="fases" role="tablist">
+                <button class="fase ativa" data-rota="/api/tokens">1. Tokens</button>
+                <button class="fase" data-rota="/api/ast">2. AST</button>
+                <button class="fase" data-rota="/api/semantic">3. Semântica</button>
+                <button class="fase" data-rota="/api/tac">4. TAC</button>
+                <button class="fase" data-rota="/api/cpp">5. C++</button>
+                <button class="fase" data-rota="/api/run">6. Executar</button>
+                <button class="fase" data-rota="/api/build" data-download="1">⬇ Executável</button>
+            </div>
+            <div id="status" class="status">Escolha uma fase.</div>
+            <pre id="saida" class="saida"></pre>
+        </section>
+    </main>
+
+    <script src="/static/js/didatico.js"></script>
+</body>
+</html>

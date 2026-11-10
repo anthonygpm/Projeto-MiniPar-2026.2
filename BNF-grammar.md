@@ -1155,7 +1155,7 @@ O analisador semântico (`src/semantic.py`) usa inferência simples de tipos com
 | `fork f(a) on core(n)` | `__fork(n, [__a0 = a]() { return f(__a0); })`: `std::thread` + `std::promise`/`std::future`, fixada no núcleo `n` (`SetThreadAffinityMask` no Windows, `pthread_setaffinity_np` no Linux) |
 | `fork f(a)` | `__fork(0, ...)`: o sistema operacional escolhe o núcleo |
 | `join t` | `__join(t)`: espera a thread e devolve o valor do `future` |
-| `format(x, n)` / `clock()` / `int(x)` / `floor(x)` | `__format` / `__clock` / `__int` / `__floor` |
+| `format(x, n)` / `clock()` / `int(x)` / `floor(x)` | `__format` / `__clock` / `__int` / `__mp_floor` |
 | `matrix(l, c, v)` | `__make_matrix(l, c, v)` |
 | `exp(x)` | `std::exp(x)` |
 | `random()` | `random_val()` |

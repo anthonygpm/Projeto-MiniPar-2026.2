@@ -1,0 +1,14 @@
+seq {
+    var aluno = 1;
+    var total = 0;
+    while (aluno <= 40) {
+        var atividade = 1;
+        while (atividade <= 4) {
+            print("[Professor] Concluiu: Aluno", aluno, "- Atividade", atividade);
+            total = total + 1;
+            atividade = atividade + 1;
+        }
+        aluno = aluno + 1;
+    }
+    print("Total de atividades:", total);
+}
