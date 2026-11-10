@@ -104,6 +104,8 @@ class CppCodeGenerator:
             # Como no Python 3: '/' é sempre divisão real (7 / 2 vale 3.5) e '%' aceita reais
             if node.op == "/": return f"__mp_div({left}, {right})"
             if node.op == "%": return f"__mp_mod({left}, {right})"
+            # '+' entre texto e numero concatena, como "t" + 3 -> "t3" (2026.2)
+            if node.op == "+": return f"__mp_add({left}, {right})"
             return f"({left} {node.op} {right})"
 
         if isinstance(node, NewExpr):
@@ -321,7 +323,67 @@ class CppCodeGenerator:
             return self._uses_float_return(node.value)
         return False
 
-    def _return_type(self, body: Optional[ASTNode]) -> str:
+    # ------------------------------------------------------------------
+    # Funções que devolvem objetos (2026.2): tipo de retorno explícito
+    #
+    # Com "auto", o C++ não deduz o retorno de métodos que se chamam em ciclo
+    # (parse_expr -> parse_term -> parse_factor -> parse_expr). Quando uma
+    # função devolve um objeto de classe C, o retorno vira std::shared_ptr<C>.
+    # ------------------------------------------------------------------
+    def _expr_class(self, expr, local: dict, cls: str | None):
+        """Classe do objeto que `expr` produz, ou None se não for um objeto conhecido."""
+        if isinstance(expr, NewExpr): return expr.class_name
+        if isinstance(expr, IdentifierExpr): return local.get(expr.name)
+        if isinstance(expr, FuncCallExpr): return self._ref_returns.get(expr.name)
+        if isinstance(expr, MethodCall):
+            if isinstance(expr.object, ThisExpr) and cls:
+                return self._ref_returns.get(f"{cls}.{expr.method_name}")
+            # objeto de outra classe: vale se só uma classe tem esse método com retorno objeto
+            achados = {c for k, c in self._ref_returns.items() if k.endswith("." + expr.method_name)}
+            return achados.pop() if len(achados) == 1 else None
+        if isinstance(expr, PropertyAccess):
+            return self._ref_fields.get(expr.property_name)
+        return None
+
+    def _infer_object_returns(self, program: Program) -> None:
+        self._ref_returns: dict[str, str] = {}
+        self._ref_fields: dict[str, str] = {}
+        funcs = []   # (chave, corpo, classe)
+        for node in program.statements:
+            if isinstance(node, FuncDecl):
+                funcs.append((node.name, node.body, None))
+            elif isinstance(node, ClassDecl):
+                for m in node.methods:
+                    funcs.append((f"{node.name}.{m.name}", m.body, node.name))
+                for attr in node.attributes:
+                    if isinstance(attr.init_value, NullExpr):
+                        self._ref_fields[attr.name] = self._null_ref_type(attr.name, node.name)[len("std::shared_ptr<"):-1]
+                    elif isinstance(attr.init_value, NewExpr):
+                        self._ref_fields[attr.name] = attr.init_value.class_name
+        for _ in range(10):   # propaga entre funções até estabilizar
+            mudou = False
+            for chave, corpo, cls in funcs:
+                local: dict[str, str] = {}
+                nos = list(_walk(corpo))
+                for _ in range(3):
+                    for n in nos:
+                        if isinstance(n, VarDecl) and n.init_value is not None:
+                            c = self._expr_class(n.init_value, local, cls)
+                            if c: local[n.name] = c
+                        elif isinstance(n, Assignment):
+                            c = self._expr_class(n.value, local, cls)
+                            if c: local[n.name] = c
+                for n in nos:
+                    if isinstance(n, ReturnStmt) and n.value is not None:
+                        c = self._expr_class(n.value, local, cls)
+                        if c and self._ref_returns.get(chave) != c:
+                            self._ref_returns[chave] = c
+                            mudou = True
+            if not mudou: break
+
+    def _return_type(self, body: Optional[ASTNode], key: str | None = None) -> str:
+        if key and key in getattr(self, "_ref_returns", {}):
+            return f"std::shared_ptr<{self._ref_returns[key]}>"
         if not self._has_value_return(body):
             return "void"
         # auto falha no g++ quando há return double e return 0 (int) na mesma função
@@ -434,6 +496,7 @@ class CppCodeGenerator:
         cpp_code = _CPP_HEADER
         self._host_functions = set()        # estado limpo a cada compilação (a IDE reutiliza o gerador)
         self._program = program
+        self._infer_object_returns(program)
         self._scan_host_forks(program)
 
         for node in program.statements:
@@ -450,7 +513,7 @@ class CppCodeGenerator:
                 self._in_method = True
                 for method in node.methods:
                     params = ", ".join(f"auto {p}" for p in method.params)
-                    ret = self._return_type(method.body)
+                    ret = self._return_type(method.body, f"{node.name}.{method.name}")
                     cpp_code += f"    {ret} {method.name}({params}) {{\n"
                     cpp_code += self._translate_body(method.body, "        ")
                     cpp_code += "    }\n"
@@ -458,7 +521,7 @@ class CppCodeGenerator:
                 cpp_code += "};\n\n"
             elif isinstance(node, FuncDecl):
                 params = ", ".join(f"auto {p}" for p in node.params)
-                ret = self._return_type(node.body)
+                ret = self._return_type(node.body, node.name)
                 cpp_code += f"{ret} {node.name}({params}) {{\n"
                 cpp_code += self._translate_body(node.body, "    ")
                 cpp_code += "}\n\n"
