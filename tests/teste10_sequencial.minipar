@@ -1,0 +1,44 @@
+seq {
+    var aluno = 1;
+    var total = 0;
+    while (aluno <= 40) {
+        var atividade = 1;
+        while (atividade <= 4) {
+            print("[Professor] Concluiu: Aluno", aluno, "- Atividade", atividade);
+            total = total + 1;
+            atividade = atividade + 1;
+        }
+        aluno = aluno + 1;
+    }
+    print("Total de atividades:", total);
+    var tela = matrix(20, 50, " ");
+    var y = 0;
+    while (y < 20) {
+        var cy = (y / 20.0) * 2.4 - 1.2;
+        var x = 0;
+        while (x < 50) {
+            var cx = (x / 50.0) * 3.0 - 2.0;
+            var zx = 0.0;
+            var zy = 0.0;
+            var iteracao = 0;
+            while (zx * zx + zy * zy <= 4.0 && iteracao < 100) {
+                var tmp = zx * zx - zy * zy + cx;
+                zy = 2.0 * zx * zy + cy;
+                zx = tmp;
+                iteracao = iteracao + 1;
+            }
+            var indice = (iteracao * 8) / 100;
+            if (indice == 1) { tela[y][x] = "."; }
+            if (indice == 2) { tela[y][x] = ":"; }
+            if (indice == 3) { tela[y][x] = "-"; }
+            if (indice == 4) { tela[y][x] = "="; }
+            if (indice == 5) { tela[y][x] = "+"; }
+            if (indice == 6) { tela[y][x] = "#"; }
+            if (indice == 7) { tela[y][x] = "%"; }
+            if (indice == 8) { tela[y][x] = "@"; }
+            x = x + 1;
+        }
+        print(tela[y]);
+        y = y + 1;
+    }
+}
