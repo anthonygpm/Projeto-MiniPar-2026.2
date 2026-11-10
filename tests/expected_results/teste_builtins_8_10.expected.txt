@@ -1,0 +1,13 @@
+==== Builtins dos testes 8 a 10 ====
+LCG 1 : estado 231794730 valor 0.060794
+LCG 2 : estado 1126946331 valor 0.102478
+LCG 3 : estado 1757975480 valor 0.131862
+LCG 4 : estado 850994577 valor 0.089628
+LCG 5 : estado 1634557174 valor 0.126115
+int(7.9): 7 int(-7.9): -7 floor(-7.9): -8
+int("42") + 1: 43
+iteracoes: 150000
+soma 64 bits: 11249925000
+linha: [  :=#@] 9 @
+3.14 2.5 1234 -0.0000
+clock ok

@@ -14,6 +14,23 @@ from cpp_template import _CPP_HEADER
 
 class CppCodeGenerator:
     @staticmethod
+    def executable_suffix() -> str:
+        """Extensão do executável gerado: '.exe' só no Windows."""
+        return ".exe" if sys.platform == "win32" else ""
+
+    @staticmethod
+    def gcc_command(cpp_path: str, exe_path: str) -> list[str]:
+        """Linha de comando do g++ para a plataforma atual.
+
+        A Winsock (-lws2_32) só existe no Windows; no Linux/macOS os sockets
+        fazem parte da libc e não precisam de biblioteca extra.
+        """
+        cmd = ["g++", "-std=c++20", "-O3", cpp_path, "-o", exe_path, "-pthread"]
+        if sys.platform == "win32":
+            cmd.append("-lws2_32")
+        return cmd
+
+    @staticmethod
     def _escape_string(value: str) -> str:
         res = []
         for ch in value:
@@ -26,8 +43,12 @@ class CppCodeGenerator:
 
     def _translate_expression(self, node: Optional[ASTNode]) -> str:
         if node is None: return "0"
-        if isinstance(node, NumberExpr): return node.value
-        if isinstance(node, StringExpr): return f'"{self._escape_string(node.value)}"'
+        if isinstance(node, NumberExpr):
+            # Inteiros em 64 bits (long long), mais próximos dos inteiros do Python:
+            # somas longas e o gerador LCG (estado * 1103515245) não estouram 32 bits
+            return node.value if "." in node.value else f"{node.value}LL"
+        # std::string (e não const char*): permite concatenar com + e indexar s[i]
+        if isinstance(node, StringExpr): return f'std::string("{self._escape_string(node.value)}")'
         if isinstance(node, BoolExpr): return "true" if node.value else "false"
         if isinstance(node, IdentifierExpr): return node.name
         if isinstance(node, UnaryExpr): return f"({node.op}{self._translate_expression(node.operand)})"
@@ -64,6 +85,14 @@ class CppCodeGenerator:
                 return f"std::stod({args})"
             if node.name == "parse_ints":
                 return f"__parse_ints({args})"
+            if node.name == "format":
+                return f"__format({args})"
+            if node.name == "clock":
+                return "__clock()"
+            if node.name == "int":
+                return f"__int({args})"
+            if node.name == "floor":
+                return f"__floor({args})"
             return f"{node.name}({args})"
 
         if isinstance(node, CChannelExpr):
@@ -86,9 +115,10 @@ class CppCodeGenerator:
             v = self._translate_expression(node.init_value)
             return f"__make_matrix({r}, {c}, {v})"
         if isinstance(node, IndexExpr):
+            # Leitura e escrita passam por __index, que confere os limites
             obj = self._translate_expression(node.object)
             idx = self._translate_expression(node.index)
-            return f"{obj}[{idx}]"
+            return f"__index({obj}, {idx})"
 
         return "0"
 
@@ -264,12 +294,12 @@ class CppCodeGenerator:
 
         os.makedirs("output", exist_ok=True)
         cpp_path = os.path.join("output", f"{output_name}.cpp")
-        exe_path = os.path.join("output", f"{output_name}.exe")
+        exe_path = os.path.join("output", output_name + self.executable_suffix())
 
         with open(cpp_path, "w", encoding="utf-8") as f: f.write(cpp_code)
         
         print("[CODEGEN] Compilando via g++ com -std=c++20 e -O3...")
-        result = subprocess.run(["g++", "-std=c++20", "-O3", cpp_path, "-o", exe_path, "-pthread", "-lws2_32"])
+        result = subprocess.run(self.gcc_command(cpp_path, exe_path))
         if result.returncode == 0:
             print(f"[SUCESSO] Executavel: {exe_path}")
             return True

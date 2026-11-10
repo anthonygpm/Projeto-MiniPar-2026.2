@@ -91,10 +91,10 @@ class RedeNeuralXOR {
 
     func testar() {
         print("==== Teste 4: rede neural XOR com backpropagation ====");
-        print("Input: [0, 0], Predicted Output:", this.feedforward(0, 0));
-        print("Input: [0, 1], Predicted Output:", this.feedforward(0, 1));
-        print("Input: [1, 0], Predicted Output:", this.feedforward(1, 0));
-        print("Input: [1, 1], Predicted Output:", this.feedforward(1, 1));
+        print("Input: [0, 0], Predicted Output:", format(this.feedforward(0, 0), 4));
+        print("Input: [0, 1], Predicted Output:", format(this.feedforward(0, 1), 4));
+        print("Input: [1, 0], Predicted Output:", format(this.feedforward(1, 0), 4));
+        print("Input: [1, 1], Predicted Output:", format(this.feedforward(1, 1), 4));
     }
 }
 

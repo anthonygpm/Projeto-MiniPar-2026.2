@@ -1,3 +1,4 @@
+# Teste 5: recomendacao e-commerce com rede neural (dados fixos do enunciado)
 func relu(x) {
     if (x > 0) {
         return x;
@@ -79,18 +80,10 @@ func nome_produto(indice) {
     return "Fantasia";
 }
 
-func ler_historico_compras() {
-    # Vetor binário: 1 = comprou, 0 = não comprou (16 produtos do catálogo)
-    var historico = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    print("==== Teste 5: recomendacao e-commerce com rede neural ====");
-    print("Informe o historico de compras (1 = comprou, 0 = nao comprou):");
-    var i = 0;
-    while (i < 16) {
-        print(nome_produto(i), "- comprou? (0/1):");
-        historico[i] = to_number(input(""));
-        i = i + 1;
-    }
-    return historico;
+# Dados fixos do enunciado: o usuario comprou Smartphone, Jeans, Micro-ondas e Ficcao.
+# Vetor binario na ordem do catalogo (16 produtos): 1 = comprou, 0 = nao comprou.
+func historico_compras() {
+    return [1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0];
 }
 
 class RedeNeuralRecomendacao {
@@ -147,7 +140,7 @@ class Recomendador {
         while (produto < 16) {
             # Recomenda apenas produtos não comprados com probabilidade > 0.55
             if ((historico[produto] == 0) && (probabilidades[produto] > 0.55)) {
-                print(nome_produto(produto), "probabilidade:", probabilidades[produto]);
+                print(nome_produto(produto));
             }
             produto = produto + 1;
         }
@@ -155,7 +148,8 @@ class Recomendador {
 }
 
 seq {
-    var historico = ler_historico_compras();
+    print("==== Teste 5: recomendacao e-commerce com rede neural ====");
+    var historico = historico_compras();
     var recomendador = new Recomendador();
     recomendador.recomendar(historico);
 }

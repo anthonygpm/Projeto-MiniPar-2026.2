@@ -11,6 +11,12 @@ from ast_nodes import (
     ForkExpr, JoinExpr, CoreTarget, HostTarget
 )
 
+# Funções nativas: nome -> quantidade de argumentos aceita (None = variável)
+_BUILTINS = {
+    "exp": 1, "random": 0, "range": None, "len": 1, "to_number": 1, "parse_ints": 1,
+    "format": 2, "clock": 0, "int": 1, "floor": 1,
+}
+
 # Tipos que podem viajar pela rede num fork ... on host(...)
 _SERIALIZABLE_TYPES = ("number", "int", "string", "bool", "list", "matrix", "var", "unknown")
 
@@ -104,6 +110,9 @@ class SemanticAnalyzer:
         if isinstance(node, FuncCallExpr):
             if node.name in ("random", "exp"): return "number"
             if node.name in ("range", "parse_ints"): return "list"
+            if node.name == "format": return "string"
+            if node.name == "clock": return "number"
+            if node.name in ("int", "floor"): return "int"
             return "unknown"
         if isinstance(node, IndexExpr): return "unknown"
         return "unknown"
@@ -257,10 +266,12 @@ class SemanticAnalyzer:
             self.validate_node(node.object)
             for arg in node.arguments: self.validate_node(arg)
         elif isinstance(node, FuncCallExpr):
-            if node.name not in self._functions and node.name not in ("exp", "random", "range", "len", "to_number", "parse_ints"):
+            if node.name not in self._functions and node.name not in _BUILTINS:
                 self._report(node.line, f"Funcao '{node.name}' nao declarada.")
             elif node.name in self._functions and len(self._functions[node.name].params) != len(node.arguments):
                 self._report(node.line, f"Funcao '{node.name}' espera {len(self._functions[node.name].params)} argumento(s), recebeu {len(node.arguments)}.")
+            elif node.name not in self._functions and _BUILTINS[node.name] is not None and _BUILTINS[node.name] != len(node.arguments):
+                self._report(node.line, f"Funcao nativa '{node.name}' espera {_BUILTINS[node.name]} argumento(s), recebeu {len(node.arguments)}.")
             for arg in node.arguments: self.validate_node(arg)
         elif isinstance(node, PropertyAccess):
             self.validate_node(node.object)

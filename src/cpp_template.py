@@ -6,6 +6,7 @@ _CPP_HEADER = """\
 #include <thread>
 #include <memory>
 #include <cstring>
+#include <cstdio>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
@@ -22,6 +23,35 @@ _CPP_HEADER = """\
   #include <unistd.h>
   #define CLOSE_SOCK close
 #endif
+
+// format(valor, casas): numero com casas decimais fixas, como f"{x:.4f}" no Python
+std::string __format(double valor, int casas) {
+    char buf[128];
+    std::snprintf(buf, sizeof(buf), "%.*f", casas, valor);
+    return std::string(buf);
+}
+
+// clock(): relogio de alta precisao em segundos (equivale a time.perf_counter()).
+// So a diferenca entre duas leituras tem significado.
+double __clock() {
+    using namespace std::chrono;
+    return duration<double>(steady_clock::now().time_since_epoch()).count();
+}
+
+// int(x): inteiro de 64 bits, truncando em direcao a zero como no Python.
+// Aceita numero ou texto ("42"). O resultado e long long, entao contas como
+// as do gerador LCG (estado * 1103515245 + 12345) nao estouram 32 bits.
+template<typename T>
+long long __int(const T& x) {
+    if constexpr (std::is_constructible_v<std::string, T>) {
+        return std::stoll(std::string(x));
+    } else {
+        return static_cast<long long>(x);
+    }
+}
+
+// floor(x): maior inteiro <= x, tambem em 64 bits (math.floor do Python)
+long long __floor(double x) { return static_cast<long long>(std::floor(x)); }
 
 // Helper para Random nativo
 double random_val() { return (double)rand() / RAND_MAX; }
@@ -59,6 +89,27 @@ std::vector<int> __minipar_range(int start, int end) {
     std::vector<int> values;
     for (int i = start; i < end; ++i) values.push_back(i);
     return values;
+}
+
+// Indexacao com verificacao de limites (lista, matriz e string).
+// Indice fora da faixa encerra o programa com erro claro, em vez de
+// corromper a memoria. Indices negativos contam do fim, como no Python.
+[[noreturn]] inline void __index_error(long long idx, size_t size) {
+    std::cerr << "[ERRO DE EXECUCAO] Indice " << idx
+              << " fora dos limites (tamanho " << size << ")." << std::endl;
+    std::exit(1);
+}
+
+template<typename C, typename I>
+decltype(auto) __index(C&& c, I idx) {
+    long long i = static_cast<long long>(idx);
+    if (i < 0) i += static_cast<long long>(c.size());
+    if (i < 0 || static_cast<size_t>(i) >= c.size()) __index_error(static_cast<long long>(idx), c.size());
+    if constexpr (std::is_same_v<std::decay_t<C>, std::string>) {
+        return std::string(1, c[static_cast<size_t>(i)]);   // s[i] devolve string de 1 caractere
+    } else {
+        return (c[static_cast<size_t>(i)]);                 // referencia: permite lista[i] = v
+    }
 }
 
 // Helper para Arrays (.pop) do Python
