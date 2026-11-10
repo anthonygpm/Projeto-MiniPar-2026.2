@@ -1,0 +1,90 @@
+# Carga deterministica por atividade: permite comparar os mesmos resultados
+# independentemente da ordem de execucao das tarefas.
+func avaliar_lote(inicio, fim) {
+    var total = 0;
+    var tarefa = inicio;
+    while (tarefa < fim) {
+        var estado = (123456789 + tarefa * 12345) % 2147483648;
+        estado = (estado * 1103515245 + 12345) % 2147483648;
+        var iteracoes = 75000 + (estado % 150001);
+        var valor = tarefa + 1;
+        var i = 0;
+        while (i < iteracoes) {
+            valor = (valor * 17 + 13) % 65521;
+            i = i + 1;
+        }
+        total = total + valor;
+        tarefa = tarefa + 1;
+    }
+    return total;
+}
+
+func mandelbrot() {
+    var resultado = "";
+    var caracteres = " .:-=+#%@";
+    var y = 0;
+    while (y < 20) {
+        var cy = (y / 20.0) * 2.4 - 1.2;
+        var x = 0;
+        while (x < 50) {
+            var cx = (x / 50.0) * 3.0 - 2.0;
+            var zx = 0.0;
+            var zy = 0.0;
+            var iteracao = 0;
+            while (zx * zx + zy * zy <= 4.0 && iteracao < 100) {
+                var tmp = zx * zx - zy * zy + cx;
+                zy = 2.0 * zx * zy + cy;
+                zx = tmp;
+                iteracao = iteracao + 1;
+            }
+            var indice = (iteracao * 8) / 100;
+            resultado = resultado + caracteres[indice];
+            x = x + 1;
+        }
+        resultado = resultado + "\n";
+        y = y + 1;
+    }
+    return resultado;
+}
+
+seq {
+    print("Teste 9: benchmark sequencial e paralelo");
+    var inicio_seq = clock();
+    var seq1 = avaliar_lote(0, 40);
+    var seq2 = avaliar_lote(40, 80);
+    var seq3 = avaliar_lote(80, 120);
+    var seq4 = avaliar_lote(120, 160);
+    var fractal_seq = mandelbrot();
+    var tempo_seq = clock() - inicio_seq;
+    var soma_seq = seq1 + seq2 + seq3 + seq4;
+
+    var inicio_par = clock();
+    var t1 = fork avaliar_lote(0, 40);
+    var t2 = fork avaliar_lote(40, 80);
+    var t3 = fork avaliar_lote(80, 120);
+    var t4 = fork avaliar_lote(120, 160);
+    var t5 = fork mandelbrot();
+    var par1 = join t1;
+    var par2 = join t2;
+    var par3 = join t3;
+    var par4 = join t4;
+    var fractal_par = join t5;
+    var tempo_par = clock() - inicio_par;
+    var soma_par = par1 + par2 + par3 + par4;
+
+    print("Atividades:", 160);
+    print("Checksum sequencial:", soma_seq);
+    print("Checksum paralelo:", soma_par);
+    if (seq1 == par1 && seq2 == par2 && seq3 == par3 && seq4 == par4 && fractal_seq == fractal_par) {
+        print("Resultados: OK");
+    } else {
+        print("Resultados: DIVERGENTES");
+    }
+    print("Tempo sequencial (s):", tempo_seq);
+    print("Tempo paralelo (s):", tempo_par);
+    if (tempo_par > 0.0) {
+        print("Speedup:", tempo_seq / tempo_par);
+    }
+    print("Mandelbrot:");
+    print(fractal_par);
+}
