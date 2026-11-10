@@ -144,6 +144,10 @@ template<typename T>
 std::string __to_string(const T& val) {
     if constexpr (std::is_constructible_v<std::string, T>) {
         return std::string(val);
+    } else if constexpr (std::is_floating_point_v<T>) {
+        std::ostringstream os;   // mesmo formato do print: 8 e 2.5 (e nao 8.000000)
+        os << val;
+        return os.str();
     } else {
         return std::to_string(val);
     }
@@ -259,56 +263,93 @@ void __keep_running(std::shared_ptr<T> tarefa) {
 template<typename T>
 using __list_elem_t = std::conditional_t<std::is_arithmetic_v<std::decay_t<T>>, double, std::decay_t<T>>;
 
+// Canal de comunicacao (c_channel): send(canal, msg) envia uma mensagem a ip:porta;
+// receive(canal) espera a proxima mensagem que chegar na porta deste computador.
+// Cada mensagem viaja numa conexao TCP propria (o remetente fecha ao terminar).
 class MiniParChannel {
 public:
     std::string ip;
     int port;
 
     MiniParChannel(std::string ip, int port) : ip(ip), port(port) {}
+    ~MiniParChannel() { if (listen_fd_ != BAD_SOCK) CLOSE_SOCK(listen_fd_); }
 
     void sendData(std::string msg) {
-        int sock = socket(AF_INET, SOCK_STREAM, 0);
-        if (sock < 0) return;
-        struct sockaddr_in serv_addr;
-        serv_addr.sin_family = AF_INET;
-        serv_addr.sin_port = htons(port);
-        inet_pton(AF_INET, ip.c_str(), &serv_addr.sin_addr);
-        
-        for(int i=0; i<50; i++) {
-            if (connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) >= 0) {
-                send(sock, msg.c_str(), msg.length(), 0);
-                break;
+        // Um socket novo a cada tentativa: um socket que falhou no connect nao
+        // pode ser reaproveitado. Espera ate ~30 s o outro lado abrir a porta.
+        for (int tentativa = 0; tentativa < 300; ++tentativa) {
+            sock_t sock = socket(AF_INET, SOCK_STREAM, 0);
+            if (sock != BAD_SOCK) {
+                sockaddr_in addr{};
+                addr.sin_family = AF_INET;
+                addr.sin_port = htons(port);
+                inet_pton(AF_INET, ip.c_str(), &addr.sin_addr);
+                if (connect(sock, (sockaddr*)&addr, sizeof(addr)) == 0) {
+                    const char* data = msg.c_str();
+                    size_t left = msg.size();
+                    while (left > 0) {
+                        int n = send(sock, data, static_cast<int>(left), SEND_FLAGS);
+                        if (n <= 0) break;
+                        data += n; left -= static_cast<size_t>(n);
+                    }
+                    CLOSE_SOCK(sock);
+                    return;
+                }
+                CLOSE_SOCK(sock);
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
-        CLOSE_SOCK(sock);
+        std::cerr << "[ERRO DE EXECUCAO] Canal: nao foi possivel enviar para " << ip << ":" << port
+                  << " (o outro programa esta rodando? firewall liberado?)" << std::endl;
     }
 
     std::string receiveData() {
-        int server_fd = socket(AF_INET, SOCK_STREAM, 0);
-        if (server_fd < 0) return "";
-        int opt = 1;
-        setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt, sizeof(opt));
-        
-        struct sockaddr_in address;
-        address.sin_family = AF_INET;
-        address.sin_addr.s_addr = INADDR_ANY;
-        address.sin_port = htons(port);
-        
-        if (bind(server_fd, (struct sockaddr*)&address, sizeof(address)) < 0) { CLOSE_SOCK(server_fd); return ""; }
-        if (listen(server_fd, 3) < 0) { CLOSE_SOCK(server_fd); return ""; }
-        
-        int new_socket = accept(server_fd, nullptr, nullptr);
-        if (new_socket < 0) { CLOSE_SOCK(server_fd); return ""; }
-        
-        char buffer[4096] = {0};
-        recv(new_socket, buffer, 4096, 0);
-        std::string result(buffer);
-        
-        CLOSE_SOCK(new_socket);
-        CLOSE_SOCK(server_fd);
+        std::lock_guard<std::mutex> lock(mutex_);
+        // A porta fica aberta enquanto o canal existir: mensagens que chegam
+        // entre dois receive() esperam na fila, em vez de serem perdidas.
+        if (listen_fd_ == BAD_SOCK) {
+            sock_t fd = socket(AF_INET, SOCK_STREAM, 0);
+            if (fd == BAD_SOCK) return "";
+#ifndef _WIN32
+            int opt = 1;   // no Windows, SO_REUSEADDR deixaria dois programas na mesma porta
+            setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt, sizeof(opt));
+#endif
+            sockaddr_in address{};
+            address.sin_family = AF_INET;
+            address.sin_addr.s_addr = INADDR_ANY;
+            address.sin_port = htons(port);
+            if (bind(fd, (sockaddr*)&address, sizeof(address)) < 0 || listen(fd, 16) < 0) {
+                std::cerr << "[ERRO DE EXECUCAO] Canal: porta " << port << " indisponivel (ja esta em uso?)" << std::endl;
+                CLOSE_SOCK(fd);
+                return "";
+            }
+            listen_fd_ = fd;
+        }
+        sock_t client = accept(listen_fd_, nullptr, nullptr);
+        if (client == BAD_SOCK) return "";
+        std::string result;
+        char buffer[4096];
+        int n;
+        while ((n = recv(client, buffer, sizeof(buffer), 0)) > 0) result.append(buffer, n);   // ate o remetente fechar
+        CLOSE_SOCK(client);
         return result;
     }
+
+private:
+#ifdef _WIN32
+    using sock_t = SOCKET;
+    static constexpr sock_t BAD_SOCK = INVALID_SOCKET;
+#else
+    using sock_t = int;
+    static constexpr sock_t BAD_SOCK = -1;
+#endif
+#ifdef MSG_NOSIGNAL
+    static constexpr int SEND_FLAGS = MSG_NOSIGNAL;   // outro lado fechou: erro, nao encerra o programa
+#else
+    static constexpr int SEND_FLAGS = 0;
+#endif
+    sock_t listen_fd_ = BAD_SOCK;
+    std::mutex mutex_;
 };
 
 """
@@ -672,8 +713,10 @@ inline void __mp_worker_serve(__mp_sock_t client, std::string who) {
 inline int __mp_worker_main(int port) {
     __mp_sock_t server = socket(AF_INET, SOCK_STREAM, 0);
     if (server == __MP_BAD_SOCK) { std::cerr << "[WORKER] Nao foi possivel criar o socket." << std::endl; return 1; }
-    int opt = 1;
+#ifndef _WIN32
+    int opt = 1;   // no Windows, SO_REUSEADDR deixaria dois workers na mesma porta
     setsockopt(server, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt, sizeof(opt));
+#endif
     sockaddr_in addr{}; addr.sin_family = AF_INET; addr.sin_addr.s_addr = INADDR_ANY; addr.sin_port = htons(port);
     if (bind(server, (sockaddr*)&addr, sizeof(addr)) < 0 || listen(server, 16) < 0) {
         std::cerr << "[WORKER] Porta " << port << " indisponivel (ja esta em uso?)." << std::endl;
