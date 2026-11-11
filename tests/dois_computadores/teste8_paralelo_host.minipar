@@ -1,0 +1,75 @@
+# Programa de Teste 8 com uma subtarefa em outro computador (MiniPar 2026.2)
+#
+# Mesma carga do teste8_paralelo.minipar: 160 atividades em 4 lotes de 40,
+# um por avaliador. Tres lotes rodam em nucleos deste computador e o lote do
+# Monitor 3 e enviado ao computador 2 com "fork ... on host(ip, porta)".
+# O join espera os quatro e o checksum tem de ser igual ao da execucao sequencial.
+#
+# Como executar:
+#   1. No computador 2:  teste8_paralelo_host --worker 5001
+#   2. Neste computador: teste8_paralelo_host   e digite o IP do computador 2
+#   (Enter vazio = 127.0.0.1, para testar os dois papeis na mesma maquina)
+
+# Carga deterministica por atividade (igual ao teste8_paralelo.minipar)
+func avaliar_lote(inicio, fim) {
+    var total = 0;
+    var tarefa = inicio;
+    while (tarefa < fim) {
+        var estado = (123456789 + tarefa * 12345) % 2147483648;
+        estado = (estado * 1103515245 + 12345) % 2147483648;
+        var iteracoes = 75000 + (estado % 150001);
+        var valor = tarefa + 1;
+        var i = 0;
+        while (i < iteracoes) {
+            valor = (valor * 17 + 13) % 65521;
+            i = i + 1;
+        }
+        total = total + valor;
+        tarefa = tarefa + 1;
+    }
+    return total;
+}
+
+var ip = input("IP do computador 2 (Enter = 127.0.0.1): ");
+if (ip == "") { ip = "127.0.0.1"; }
+
+seq {
+    print("Teste 8: benchmark sequencial e paralelo (3 nucleos + 1 computador remoto)");
+    var inicio_seq = clock();
+    var seq1 = avaliar_lote(0, 40);
+    var seq2 = avaliar_lote(40, 80);
+    var seq3 = avaliar_lote(80, 120);
+    var seq4 = avaliar_lote(120, 160);
+    var tempo_seq = clock() - inicio_seq;
+    var soma_seq = seq1 + seq2 + seq3 + seq4;
+
+    var inicio_par = clock();
+    var t1 = fork avaliar_lote(0, 40) on core(1);           # Professor  - nucleo 1
+    var t2 = fork avaliar_lote(40, 80) on core(2);          # Monitor 1  - nucleo 2
+    var t3 = fork avaliar_lote(80, 120) on core(3);         # Monitor 2  - nucleo 3
+    var t4 = fork avaliar_lote(120, 160) on host(ip, 5001); # Monitor 3  - computador 2
+    var par1 = join t1;
+    var par2 = join t2;
+    var par3 = join t3;
+    var par4 = join t4;
+    var tempo_par = clock() - inicio_par;
+    var soma_par = par1 + par2 + par3 + par4;
+
+    print("Atividades:", 160);
+    print("Professor (nucleo 1):", par1);
+    print("Monitor 1 (nucleo 2):", par2);
+    print("Monitor 2 (nucleo 3):", par3);
+    print("Monitor 3 (computador " + ip + "):", par4);
+    print("Checksum sequencial:", soma_seq);
+    print("Checksum paralelo:", soma_par);
+    if (seq1 == par1 && seq2 == par2 && seq3 == par3 && seq4 == par4) {
+        print("Resultados: OK");
+    } else {
+        print("Resultados: DIVERGENTES");
+    }
+    print("Tempo sequencial (s):", tempo_seq);
+    print("Tempo paralelo (s):", tempo_par);
+    if (tempo_par > 0.0) {
+        print("Speedup:", tempo_seq / tempo_par);
+    }
+}

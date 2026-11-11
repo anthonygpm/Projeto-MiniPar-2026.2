@@ -78,3 +78,22 @@ def test_teste2_fibonacci_no_outro_computador():
     assert "Fatorial de 5 (computador 1): 120" in exe.stdout
     assert "Fibonacci (computador 2): [0, 1, 1, 2, 3, 5, 8, 13]" in exe.stdout
     assert "Executando fibonacci(i64)" in log
+
+
+@precisa_gpp
+def test_teste8_com_um_lote_no_outro_computador():
+    nome = "dois_computadores/teste8_paralelo_host"
+    _compilar(nome)
+    worker = subprocess.Popen([_exe(nome), "--worker", "5001"], cwd=ROOT, text=True,
+                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    try:
+        time.sleep(0.5)
+        exe = executar(nome, stdin="\n", timeout=60)
+    finally:
+        worker.kill()
+    log = worker.communicate()[0]
+    assert exe.returncode == 0, exe.stderr
+    assert "Checksum sequencial: 4854810" in exe.stdout
+    assert "Checksum paralelo: 4854810" in exe.stdout
+    assert "Resultados: OK" in exe.stdout
+    assert "Executando avaliar_lote(i64,i64)" in log   # o lote do Monitor 3 rodou no worker
