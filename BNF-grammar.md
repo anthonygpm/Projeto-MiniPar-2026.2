@@ -1,21 +1,28 @@
-# Gramática Formal BNF — Linguagem MiniPar 2026.1
+# Gramática Formal BNF — Linguagem MiniPar 2026.2
 
-**Projeto:** MiniPar-Improvement — Compilador da Linguagem MiniPar 2026.1 Orientada a Objetos  
-**Autores:** Emanuele Vitória de Jesus Lima · Jose Lucas de Oliveira Quintela · Luiz Miguel de Melo Bomfim  
+**Projeto:** Compilador da Linguagem MiniPar 2026.2 (orientada a objetos, com paralelismo Fork/Join)  
+**Autores (2026.2):** Anthony Gabriel Paulino de Moura · Pedro Cabral Gomes · Lucas Teodosio Maciel de Oliveira · Vinicius Gabriel Silva Santiago  
+**Base (2026.1):** MiniPar-Improvement, de Emanuele Vitória de Jesus Lima · Jose Lucas de Oliveira Quintela · Luiz Miguel de Melo Bomfim  
 **Instituição:** Universidade Federal de Alagoas — Instituto de Computação · Ciência da Computação  
 **Disciplina:** Compiladores — Prof. Arturo Hernandez Dominguez  
-**Repositório:** https://github.com/luizwhirl/minipar-improvement  
+**Repositório:** https://github.com/anthonygpm/Projeto-MiniPar-2026.2 (base 2026.1: https://github.com/luizwhirl/minipar-improvement)  
 
 ---
 
 > Esta gramática foi derivada diretamente da implementação real do compilador
 > (arquivos `src/lexer.py`, `src/parser.py` e `src/ast_nodes.py`), cruzada com
 > o relatório técnico do projeto e as especificações formais fornecidas pelo professor.
-> Ela descreve **toda** a sintaxe aceita pelo compilador MiniPar 2026.1.
+> Ela descreve **toda** a sintaxe aceita pelo compilador MiniPar 2026.2.
 >
-> **Acréscimos 2026.2:** paralelismo com `fork` e `join`, com a subtarefa
-> alocada a um núcleo da CPU (`core`) ou a outro computador (`host`).
-> Ver a seção 6.3 e as produções marcadas na gramática consolidada.
+> **Acréscimos 2026.2** (marcados com `2026.2` ao longo do texto):
+> - paralelismo com `fork` e `join`, com a subtarefa alocada a um núcleo da CPU
+>   (`on core(n)`), a outro computador (`on host(ip, porta)`) ou ao sistema
+>   operacional (sem `on`) — seção 6.3;
+> - literal `null` para referências a objetos ausentes — seções 2.2 e 14.5;
+> - concatenação de texto com número (`"total: " + n`) — Notas de Implementação;
+> - função nativa `write_file(caminho, texto)` e `clock`, `int`, `floor`, `format` — seção 15;
+> - divisão real (`7 / 2` vale `3.5`) com erro em divisão por zero;
+> - tipo de retorno explícito em C++ para funções que devolvem objetos.
 
 ---
 
@@ -69,7 +76,7 @@ break  continue  return
 seq  par  this
 c_channel  send  receive  input  print  matrix
 fork  join  on  core  host          (2026.2)
-true  false
+true  false  null                   (null: 2026.2)
 number  int  string  bool  void  list  dict
 ```
 
@@ -79,6 +86,7 @@ number  int  string  bool  void  list  dict
 <NUMBER>         ::= <digito> { <digito> } [ "." <digito> { <digito> } ]
 <STRING_LITERAL> ::= '"' { <caractere> } '"'
 <BOOL_LITERAL>   ::= "true" | "false"
+<NULL_LITERAL>   ::= "null"                                   (* 2026.2 *)
 <IDENTIFIER>     ::= ( <letra> | "_" ) { <letra> | <digito> | "_" }
 ```
 
@@ -613,6 +621,7 @@ As expressões seguem a hierarquia de precedência implementada no parser (da me
 <expressao_primaria> ::= <NUMBER>
                        | <STRING_LITERAL>
                        | <BOOL_LITERAL>
+                       | "null"                          (* 2026.2 *)
                        | <IDENTIFIER> [ "(" [ <lista_argumentos> ] ")" ]
                        | "this"
                        | <expressao_new>
@@ -821,6 +830,28 @@ encerra o programa com `[ERRO DE EXECUCAO] Divisao por zero.`
 <digito> ::= "0" | ... | "9"
 ```
 
+### 14.5 Null (2026.2)
+
+```bnf
+<NULL_LITERAL> ::= "null"
+```
+
+`null` representa a ausência de objeto, por exemplo os filhos vazios de um nó de
+árvore. Pode ser atribuído a variáveis e atributos que guardam objetos, e comparado
+com `==` / `!=`. Não é aceito em variáveis declaradas como `number`, `int`, `string`
+ou `bool`. No C++ gerado vira `nullptr`, e a variável recebe o tipo
+`std::shared_ptr<Classe>` inferido das atribuições `x = new Classe(...)`.
+
+```minipar
+class No {
+    var valor = 0;
+    var esquerda = null;
+    var direita = null;
+}
+var raiz = new No();
+if (raiz.esquerda == null) { print("folha"); }
+```
+
 ---
 
 ## 15. Biblioteca Nativa
@@ -841,6 +872,7 @@ As seguintes funções são reconhecidas pelo analisador semântico e traduzidas
 | `clock()` | `clock()` → `number` | Relógio de alta precisão em segundos, como `time.perf_counter()` (2026.2) |
 | `int(x)` | `int(number\|string)` → `int` | Inteiro de 64 bits, truncando em direção a zero (2026.2) |
 | `floor(x)` | `floor(number)` → `int` | Maior inteiro ≤ x, em 64 bits (2026.2) |
+| `write_file(caminho, texto)` | `write_file(string, string)` | Grava o texto no arquivo, substituindo o conteúdo; usado pelo Teste 11 para salvar o `.arm` (2026.2) |
 
 Indexação de string (2026.2): `s[i]` devolve um texto de 1 caractere, como no Python.
 Índices negativos contam do fim (`s[-1]`). Em listas, matrizes e strings, um índice fora
@@ -1045,6 +1077,7 @@ A seguir a gramática completa em formato BNF, em ordem de definição:
 <expressao_primaria> ::= <NUMBER>
                        | <STRING_LITERAL>
                        | <BOOL_LITERAL>
+                       | "null"                          (* 2026.2 *)
                        | <IDENTIFIER> [ "(" [ <lista_argumentos> ] ")" ]
                        | "this"
                        | <expressao_new>
@@ -1066,6 +1099,7 @@ A seguir a gramática completa em formato BNF, em ordem de definição:
 <NUMBER>         ::= <digito> { <digito> } [ "." { <digito> } ]
 <STRING_LITERAL> ::= '"' { <caractere_string> } '"'
 <BOOL_LITERAL>   ::= "true" | "false"
+<NULL_LITERAL>   ::= "null"   (* 2026.2: objeto ausente *)
 <IDENTIFIER>     ::= ( <letra> | "_" ) { <letra> | <digito> | "_" }
 
 <caractere_string> ::= <qualquer_char_exceto_aspas_e_barra>
@@ -1094,6 +1128,7 @@ O analisador semântico (`src/semantic.py`) usa inferência simples de tipos com
 | Literal numérico | `number` |
 | Literal string | `string` |
 | Literal booleano | `bool` |
+| `null` (2026.2) | `null` (compatível com variáveis de objeto, não com `number`, `int`, `string`, `bool`) |
 | Lista literal `[...]` | `list` |
 | `fork f(...)` (2026.2) | `task` |
 | `join t` (2026.2) | `unknown` (tipo do retorno da subtarefa) |
@@ -1105,6 +1140,7 @@ O analisador semântico (`src/semantic.py`) usa inferência simples de tipos com
 | `this` | nome da classe atual |
 | `op` relacional / lógico | `bool` |
 | `"a" + "b"` (concatenação) | `string` |
+| `"a" + n` ou `n + "a"` (2026.2) | `string` (o número é convertido para texto) |
 | Operação aritmética | `number` |
 | Identificador | tipo declarado na tabela de símbolos |
 | Desconhecido | `unknown` (compatível com qualquer tipo) |
@@ -1154,6 +1190,10 @@ O analisador semântico (`src/semantic.py`) usa inferência simples de tipos com
 | `["a", "b"]` | `std::vector<std::string>{...}` |
 | `var l = []; ... l.append(v);` | `std::vector<T>` com `T` deduzido do primeiro `append` (números: `double`) |
 | `lista[i]` | `__index(lista, i)` (confere os limites) |
+| `null` (2026.2) | `nullptr` (variável ou atributo tipado como `std::shared_ptr<Classe>`) |
+| `texto + n` (2026.2) | `__mp_add(texto, n)`: concatena quando um dos lados é texto, soma caso contrário |
+| `write_file(c, t)` (2026.2) | `__write_file(c, t)` (`std::ofstream`) |
+| função que devolve objeto (2026.2) | retorno explícito `std::shared_ptr<Classe>`, para permitir recursão mútua entre funções e métodos |
 | `a / b` · `a % b` | `__mp_div(a, b)` (sempre `double`) · `__mp_mod(a, b)` (`%` ou `std::fmod`) |
 | `fork f(a) on core(n)` | `__fork(n, [__a0 = a]() { return f(__a0); })`: `std::thread` + `std::promise`/`std::future`, fixada no núcleo `n` (`SetThreadAffinityMask` no Windows, `pthread_setaffinity_np` no Linux) |
 | `fork f(a)` | `__fork(0, ...)`: o sistema operacional escolhe o núcleo |
@@ -1172,4 +1212,4 @@ O analisador semântico (`src/semantic.py`) usa inferência simples de tipos com
 
 ---
 
-*Gramática gerada em 15 de junho de 2026 — MiniPar-Improvement v2026.1*
+*Gramática 2026.1 gerada em 15 de junho de 2026 (MiniPar-Improvement) e atualizada em 10 de novembro de 2026 para a versão 2026.2.*
