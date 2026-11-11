@@ -158,7 +158,7 @@ def exibir_menu():
 
     while True:
         print("\n" + "=" * 45)
-        print(" Menu de Testes - Compilador MiniPar 2026.1")
+        print(" Menu de Testes - Compilador MiniPar 2026.2")
         print("=" * 45)
         print("1 - Rodar todos os testes automaticamente")
         print("2 - Escolher 1 teste para rodar")
